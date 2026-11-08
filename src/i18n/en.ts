@@ -7,6 +7,7 @@ export default {
 
   'common.back': 'Back',
   'common.cancel': 'Cancel',
+  'common.close': 'Close',
   'common.delete': 'Delete',
   'common.save': 'Save',
   'common.selectAll': 'Select all',
@@ -67,6 +68,13 @@ export default {
   'settings.current': 'Current: {value}',
   'settings.openTrash': 'Trash',
   'settings.trashCount': '{n} items',
+  'about.title': 'About the author',
+  'about.name': 'Lin Guanguo',
+  'about.email': 'Email',
+  'about.github': 'GitHub',
+  'about.tapToCopy': 'Tap to copy',
+  'about.copied': 'Copied',
+  'about.copyLabel': 'Copy {item}',
 
   'sync.title': 'Sync (WebDAV)',
   'sync.url': 'Server URL',

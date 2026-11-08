@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useBackHandler } from '../back'
+import AboutDialog from '../components/AboutDialog.vue'
 import AppIcon from '../components/AppIcon.vue'
 import DurationDialog from '../components/DurationDialog.vue'
 import SyncSettings from '../components/SyncSettings.vue'
@@ -14,6 +15,7 @@ const isCustom = computed(() => !RETENTION_PRESETS.includes(retentionHours.value
 useBackHandler(closeScreen)
 
 const customOpen = ref(false)
+const aboutOpen = ref(false)
 
 async function chooseRetention(hours: number) {
   retentionHours.value = hours
@@ -69,10 +71,16 @@ onMounted(async () => {
 
       <h2 class="section-title">{{ t('sync.title') }}</h2>
       <SyncSettings />
+
+      <button class="row-link" type="button" style="margin: 24px 0" @click="aboutOpen = true">
+        <span>{{ t('about.title') }}</span>
+        <AppIcon name="chevron" :size="16" />
+      </button>
     </main>
 
     <DurationDialog v-if="customOpen" :title="t('settings.customTitle')" :minutes="retentionHours * 60" :units="['hours', 'days']"
       :off-label="t('settings.neverClear')" :fallback-minutes="7 * 24 * 60"
       @cancel="customOpen = false" @save="(minutes) => { customOpen = false; chooseRetention(minutes / 60) }" />
+    <AboutDialog v-if="aboutOpen" @close="aboutOpen = false" />
   </div>
 </template>

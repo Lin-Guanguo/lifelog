@@ -6,6 +6,7 @@ export default {
 
   'common.back': '返回',
   'common.cancel': '取消',
+  'common.close': '关闭',
   'common.delete': '删除',
   'common.save': '保存',
   'common.selectAll': '全选',
@@ -66,6 +67,13 @@ export default {
   'settings.current': '当前：{value}',
   'settings.openTrash': '回收站',
   'settings.trashCount': '{n} 项',
+  'about.title': '关于作者',
+  'about.name': '林观果',
+  'about.email': '邮箱',
+  'about.github': 'GitHub',
+  'about.tapToCopy': '点击复制',
+  'about.copied': '已复制',
+  'about.copyLabel': '复制{item}',
 
   'sync.title': '同步（WebDAV）',
   'sync.url': '服务器地址',

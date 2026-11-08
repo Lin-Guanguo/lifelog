@@ -69,7 +69,8 @@ test('WebDAV sync: upload, interval auto-sync, automatic merge on a fresh instal
   await send(page, '旧手机 第三条')
   await page.getByRole('button', { name: 'LifeLog，打开设置' }).click()
   await page.getByRole('button', { name: '立即同步' }).click()
-  await expect(page.getByRole('status')).not.toContainText('有改动待同步')
+  // Finished: back to "last synced" with nothing pending (not merely "syncing…")
+  await expect(page.getByRole('status')).toHaveText(/^上次同步[^待]*$/)
   expect((await remote()).live).toEqual(['旧手机 第一条', '旧手机 第三条', '旧手机 第二条'])
 
   // A fresh install merges the existing backup automatically instead of overwriting it
