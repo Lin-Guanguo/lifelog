@@ -84,6 +84,23 @@ test('WebDAV sync: upload, interval auto-sync, automatic merge on a fresh instal
   await phone.getByRole('button', { name: '返回' }).click()
   await expect(phone.locator('main .entry')).toHaveCount(4)
 
+  // Custom interval: 90 minutes, then manual only
+  await phone.getByRole('button', { name: 'LifeLog，打开设置' }).click()
+  const phoneInterval = phone.getByRole('group', { name: '自动同步间隔' })
+  await phoneInterval.getByRole('button', { name: '自定义' }).click()
+  const dialog = phone.getByRole('alertdialog', { name: '自定义同步间隔' })
+  await dialog.getByLabel('时长').fill('90')
+  await dialog.getByRole('button', { name: '分钟' }).click()
+  await dialog.getByRole('button', { name: '保存' }).click()
+  await expect(phoneInterval.getByRole('button', { name: '自定义' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(phone.getByText('当前：90分钟')).toBeVisible()
+  await phoneInterval.getByRole('button', { name: '自定义' }).click()
+  await expect(dialog.getByLabel('时长')).toHaveValue('90')
+  await dialog.getByLabel('仅手动同步').check()
+  await dialog.getByRole('button', { name: '保存' }).click()
+  await expect(phone.getByText('当前：仅手动同步')).toBeVisible()
+  await phone.getByRole('button', { name: '返回' }).click()
+
   // Settings survive a reload
   await phone.reload()
   await expect(phone.locator('.sync-chip')).toHaveText(/^已同步/)

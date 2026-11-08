@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { dateOf, formatMinutes, timeOf } from '../format'
+import DurationDialog from './DurationDialog.vue'
 import { t } from '../i18n'
 import { INTERVAL_PRESETS, remotePath, removeSettings, saveSettings, setSyncInterval, sync, syncNow } from '../sync/controller'
 
@@ -13,6 +14,13 @@ const form = reactive({
 const testing = ref(false)
 const formError = ref('')
 const busy = computed(() => testing.value || sync.status === 'syncing')
+const customOpen = ref(false)
+const isCustom = computed(() => !!sync.settings && !INTERVAL_PRESETS.includes(sync.settings.intervalMinutes))
+
+async function chooseCustom(minutes: number) {
+  customOpen.value = false
+  await setSyncInterval(minutes)
+}
 
 async function save() {
   testing.value = true
@@ -60,13 +68,20 @@ async function remove() {
         <div class="seg" role="group" :aria-label="t('sync.interval')">
           <button v-for="minutes in INTERVAL_PRESETS" :key="minutes" type="button" :aria-pressed="sync.settings.intervalMinutes === minutes"
             @click="setSyncInterval(minutes)">
-            {{ minutes > 0 ? formatMinutes(minutes) : t('sync.manualOnly') }}
+            {{ formatMinutes(minutes) }}
           </button>
+          <button type="button" :aria-pressed="isCustom" @click="customOpen = true">{{ t('settings.custom') }}</button>
         </div>
+        <span v-if="isCustom" class="hint" style="margin: 0">
+          {{ t('settings.current', { value: sync.settings.intervalMinutes > 0 ? formatMinutes(sync.settings.intervalMinutes) : t('sync.manualOnly') }) }}
+        </span>
         <p class="hint" style="margin: 0">{{ t('sync.intervalHint') }}</p>
       </div>
     </div>
     <p class="hint">{{ t('sync.file', { path: remotePath(sync.settings) }) }}</p>
+    <DurationDialog v-if="customOpen" :title="t('sync.customTitle')" :minutes="sync.settings.intervalMinutes"
+      :units="['minutes', 'hours', 'days']" :off-label="t('sync.manualOnly')" :fallback-minutes="24 * 60"
+      @cancel="customOpen = false" @save="chooseCustom" />
   </template>
 </template>
 

@@ -15,9 +15,11 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: 'pnpm exec vite --port 5199 --strictPort',
+      // The production bundle, as shipped in the APK.
+      command: 'pnpm build && pnpm exec vite preview --port 5199 --strictPort',
       url: 'http://localhost:5199',
       reuseExistingServer: false,
+      timeout: 120_000,
     },
     {
       command: 'node test-support/webdav-server.ts 5300',

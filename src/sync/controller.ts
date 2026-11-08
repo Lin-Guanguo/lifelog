@@ -12,7 +12,7 @@ export interface SyncSettings extends WebDavConfig {
   intervalMinutes: number // automatic sync interval; 0 = manual only
 }
 
-export const INTERVAL_PRESETS = [5, 60, 24 * 60, 0]
+export const INTERVAL_PRESETS = [5, 60, 24 * 60] // anything else, including 0, is custom
 const DEFAULT_INTERVAL_MINUTES = 24 * 60
 const CHECK_EVERY_MS = 60_000
 

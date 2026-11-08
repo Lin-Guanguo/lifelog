@@ -57,7 +57,7 @@ One sync step:
    partial file. Otherwise just adopt the remote version (no ping-pong between devices).
 
 Automatic sync runs on start, on resume and every minute while open, but only once the chosen
-interval (5 minutes / 1 hour / 1 day / manual only; default 1 day) has passed since the last sync or
+interval (5 minutes / 1 hour / 1 day, or custom minutes/hours/days or manual only; default 1 day) has passed since the last sync or
 failed attempt. "Sync now" runs immediately. A fresh install restores itself by merging the backup.
 
 Known limit: rows deleted forever on one device come back (into the trash) when merged from a
