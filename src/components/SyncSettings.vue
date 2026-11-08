@@ -9,7 +9,7 @@ const form = reactive({
   url: sync.settings?.url ?? '',
   username: sync.settings?.username ?? '',
   password: sync.settings?.password ?? '',
-  directory: sync.settings?.directory ?? 'LifeLog',
+  directory: sync.settings?.directory ?? 'lifelog',
 })
 const testing = ref(false)
 const formError = ref('')

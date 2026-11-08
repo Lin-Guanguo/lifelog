@@ -6,7 +6,7 @@ const DAV = 'http://127.0.0.1:5300/dav/'
 const AUTH = `Basic ${Buffer.from('me:secret').toString('base64')}`
 
 async function remote(): Promise<{ version: number; live: string[] }> {
-  const res = await fetch(`${DAV}LifeLog/lifelog.sqlite`, { headers: { Authorization: AUTH } })
+  const res = await fetch(`${DAV}lifelog/lifelog.sqlite`, { headers: { Authorization: AUTH } })
   expect(res.status).toBe(200)
   const SQL = await initSqlJs()
   const db = new SQL.Database(new Uint8Array(await res.arrayBuffer()))
@@ -28,7 +28,6 @@ async function configure(page: Page, password = 'secret') {
   await page.getByLabel('服务器地址').fill(DAV)
   await page.getByLabel('用户名').fill('me')
   await page.getByLabel('密码 / 应用密码').fill(password)
-  await page.getByLabel('远端目录').fill('LifeLog')
   await page.getByRole('button', { name: '保存并测试连接' }).click()
 }
 
@@ -46,7 +45,7 @@ test('WebDAV sync: upload, interval auto-sync, automatic merge on a fresh instal
   await page.getByLabel('密码 / 应用密码').fill('secret')
   await page.getByRole('button', { name: '保存并测试连接' }).click()
   await expect(page.getByRole('status')).toContainText('上次同步')
-  await expect(page.getByText('远端文件：LifeLog/lifelog.sqlite')).toBeVisible()
+  await expect(page.getByText('远端文件：lifelog/lifelog.sqlite')).toBeVisible()
   expect(await remote()).toEqual({ version: 1, live: ['旧手机 第一条'] })
 
   // Default interval is one day; switch to 5 minutes
