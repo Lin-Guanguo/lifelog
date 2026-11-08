@@ -17,7 +17,9 @@ src/
   store.ts, back.ts    shared state, Android back-button stack
 e2e/                   Playwright acceptance flow
 android/               Capacitor Android project (committed; build output ignored)
-docs/                  spec and mockups
+docs/                  spec and mockups (including the app icon)
+resources/             icon source SVG
+scripts/               build helpers (sql.js wasm copy, icon generation)
 ```
 
 ## Setup
@@ -49,6 +51,15 @@ cd android && ./gradlew assembleDebug
 ```
 
 The debug APK is signed with this machine's debug key; later builds from the same machine install as updates.
+
+## App icon
+
+`resources/icon-foreground.svg` is the source. After changing it, regenerate the Android launcher icons and
+splash screens (needs a Chromium for Playwright; `PW_CHROMIUM_PATH` works here too):
+
+```bash
+node scripts/gen-icons.mjs
+```
 
 ## Notes
 
