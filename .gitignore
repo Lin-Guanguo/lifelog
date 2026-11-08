@@ -20,9 +20,13 @@ playwright-report/
 *.p12
 *.mobileprovision
 
-# Environment and editors
+# Local secrets and data (see .env.example, scripts/backup.mjs)
 .env
 .env.*
+!.env.example
+.data/
+
+# Editors
 *.local
 *.log
 .DS_Store

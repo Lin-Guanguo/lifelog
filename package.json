@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "android": "pnpm build && cap sync android",
     "test": "vitest run src",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "backup:pull": "node scripts/backup.mjs pull",
+    "backup:show": "node scripts/backup.mjs show"
   },
   "dependencies": {
     "@capacitor-community/sqlite": "8.1.1",

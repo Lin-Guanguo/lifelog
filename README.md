@@ -52,6 +52,17 @@ cd android && ./gradlew assembleDebug
 
 The debug APK is signed with this machine's debug key; later builds from the same machine install as updates.
 
+## Read the backup locally
+
+The app syncs a standard SQLite file to `<folder>/lifelog.sqlite` on WebDAV. To fetch and read it here,
+copy `.env.example` to `.env` (ignored by git) and fill in the same server, user, app password and folder:
+
+```bash
+pnpm backup:pull         # → .data/lifelog.sqlite (ignored by git)
+pnpm backup:show 50      # summary + latest 50 entries
+sqlite3 .data/lifelog.sqlite 'SELECT * FROM records'
+```
+
 ## App icon
 
 `resources/icon-foreground.svg` is the source. After changing it, regenerate the Android launcher icons and
