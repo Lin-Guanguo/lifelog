@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LifeLog mockups</title>
+<style>
+  :root {
+    --ground: #F5F6F4; --surface: #FFFFFF; --ink: #1A1C1B; --muted: #5C635E;
+    --line: #E2E5E1; --accent: #2F5FD0; --accent-soft: #EAF0FC;
+    --pending: #B45309; --pending-soft: #FFF4E5; --ok: #1E6B3A; --ok-soft: #E7F4EC; --danger: #B42318;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 32px; background: #D9DDD8; color: var(--ink);
+    font-family: Inter, "Noto Sans SC", "PingFang SC", system-ui, sans-serif; }
+  h1.page { margin: 0 0 8px; font-size: 28px; }
+  p.lede { margin: 0 0 24px; color: #3A3F3C; font-size: 14px; max-width: 900px; line-height: 1.5; }
+  .row { display: flex; flex-wrap: wrap; gap: 40px; align-items: flex-start; }
+  figure { margin: 0; display: flex; flex-direction: column; gap: 10px; width: 390px; }
+  figcaption { font-size: 14px; font-weight: 600; color: #3A3F3C; }
+  figcaption small { display: block; font-weight: 400; margin-top: 2px; line-height: 1.45; }
+  .phone { width: 390px; height: 844px; display: flex; flex-direction: column; background: var(--ground);
+    border-radius: 28px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 8px 24px rgba(0,0,0,.08); position: relative; }
+  header { display: flex; align-items: center; gap: 8px; padding: 16px 12px 8px 20px; border-bottom: 1px solid var(--line); background: var(--ground); }
+  header.back { padding-left: 4px; }
+  header h2 { margin: 0; font-size: 20px; font-weight: 600; flex-grow: 1; }
+  header h2.brand { font-size: 22px; }
+  .icon { width: 44px; height: 44px; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 18px;
+    display: flex; align-items: center; justify-content: center; border-radius: 12px; flex-shrink: 0; }
+  .textbtn { height: 44px; border: 0; background: transparent; color: var(--accent); font: inherit; font-size: 15px; padding: 0 8px; }
+  .chip { display: flex; align-items: center; gap: 6px; font-size: 12px; padding: 6px 10px; border-radius: 999px; }
+  .chip.ok { color: var(--ok); background: var(--ok-soft); }
+  .chip.pending { color: var(--pending); background: var(--pending-soft); }
+  main { flex-grow: 1; overflow: hidden; display: flex; flex-direction: column; gap: 4px; padding: 12px 16px; }
+  main.stream { justify-content: flex-end; }
+  .daypill { align-self: center; margin: 10px 0 6px; font-size: 12px; color: var(--muted); background: #E9ECE8; padding: 4px 10px; border-radius: 999px; }
+  .entry { display: flex; gap: 12px; padding: 6px 4px; align-items: baseline; border-radius: 10px; }
+  .entry time { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 40px; flex-shrink: 0; }
+  .entry p, .entry .text { margin: 0; font-size: 16px; line-height: 1.45; flex-grow: 1; }
+  .entry .clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .entry.sel { background: var(--accent-soft); }
+  .entry.focus { background: var(--surface); box-shadow: 0 0 0 2px var(--accent); }
+  .ver { align-self: center; flex-shrink: 0; border: 0; background: #E9ECE8; color: var(--muted); font: inherit; font-size: 12px; padding: 4px 8px; border-radius: 999px; }
+  .composer { display: flex; align-items: flex-end; gap: 8px; padding: 10px 12px 24px; background: var(--surface); border-top: 1px solid var(--line); }
+  .composer textarea { flex-grow: 1; border: 1px solid #D5D9D4; border-radius: 14px; outline: none; resize: none; font: inherit; font-size: 16px;
+    line-height: 1.5; color: var(--ink); background: var(--ground); padding: 10px 12px; }
+  .primary { min-width: 64px; height: 46px; border: 0; border-radius: 12px; background: var(--accent); color: #fff; font: inherit; font-size: 15px; font-weight: 600; padding: 0 14px; }
+  .secondary { height: 40px; border: 1px solid #C9CFC8; border-radius: 10px; background: var(--surface); color: var(--ink); font: inherit; font-size: 14px; padding: 0 14px; }
+  .danger-text { color: var(--danger); }
+  .danger-fill { width: 100%; height: 48px; border: 0; border-radius: 12px; background: var(--danger); color: #fff; font: inherit; font-size: 16px; font-weight: 600; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .hint { margin: 0 4px; font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .day { margin: 0 4px 6px; font-size: 13px; font-weight: 500; color: var(--muted); }
+  .card { background: var(--surface); border-radius: 14px; padding: 6px 0; }
+  .card .entry { padding: 9px 14px; border-radius: 0; }
+  mark { background: #FFE7A8; color: var(--ink); border-radius: 3px; padding: 0 2px; }
+  .ctx { opacity: .62; }
+  footer.bar { padding: 10px 16px 24px; background: var(--surface); border-top: 1px solid var(--line); display: flex; gap: 8px; }
+  .scrim { position: absolute; inset: 0; background: rgba(20,22,21,.42); }
+  .sheet { position: absolute; left: 0; right: 0; bottom: 0; background: var(--surface); border-radius: 22px 22px 0 0; padding: 10px 20px 28px;
+    display: flex; flex-direction: column; gap: 12px; }
+  .grabber { align-self: center; width: 40px; height: 5px; border-radius: 3px; background: #D0D4CF; }
+  .meta { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); flex-wrap: wrap; }
+  .longtext { margin: 0; font-size: 17px; line-height: 1.6; white-space: pre-line; }
+  .vrow { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-bottom: 1px solid #EDEFEC; }
+  .vrow:last-child { border-bottom: 0; }
+  .vrow.active { background: var(--accent-soft); }
+  .vhead { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+  .vhead b { color: var(--ink); font-size: 13px; }
+  .badge { font-size: 11px; font-weight: 600; color: var(--accent); background: #fff; border: 1px solid var(--accent); padding: 1px 8px; border-radius: 999px; }
+  .vtext { margin: 0; font-size: 15px; line-height: 1.45; }
+  .vactions { display: flex; gap: 8px; justify-content: flex-end; }
+  .field { display: flex; flex-direction: column; gap: 4px; padding: 10px 0; border-bottom: 1px solid #EDEFEC; }
+  .field:last-child { border-bottom: 0; }
+  .field label { font-size: 12px; color: var(--muted); }
+  .field input { border: 0; outline: none; font: inherit; font-size: 15px; padding: 2px 0; background: transparent; color: var(--ink); }
+  .toggle { display: flex; align-items: center; gap: 12px; min-height: 50px; }
+  .toggle + .toggle { border-top: 1px solid #EDEFEC; }
+  .toggle > span:first-child { flex-grow: 1; font-size: 15px; }
+  input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--accent); margin: 0; flex-shrink: 0; }
+  section.group { display: flex; flex-direction: column; gap: 8px; }
+  .seg { display: flex; background: #E9ECE8; border-radius: 10px; padding: 3px; gap: 3px; }
+  .seg button { flex: 1; height: 38px; border: 0; border-radius: 8px; background: transparent; font: inherit; font-size: 14px; color: var(--ink); }
+  .seg button[aria-pressed=true] { background: var(--surface); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.1); }
+  .trow { display: flex; gap: 12px; padding: 12px 14px; border-bottom: 1px solid #EDEFEC; align-items: flex-start; }
+  .trow:last-child { border-bottom: 0; }
+  .trow.sel { background: var(--accent-soft); }
+  .trow .body { flex-grow: 1; display: flex; flex-direction: column; gap: 4px; }
+  .trow .tmeta { display: flex; gap: 8px; font-size: 12px; color: var(--muted); }
+  .trow .tmeta .left { margin-left: auto; color: var(--pending); }
+  .kind { font-size: 11px; color: var(--muted); background: #E9ECE8; padding: 1px 6px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<h1 class="page">LifeLog · v1 screens</h1>
+<p class="lede">Gestures on the main list: long-press = multi-select delete · double-tap = detail sheet · the sheet has full-screen · edit · delete icons stacked bottom-right. Tap “LifeLog ›” for Settings; the trash is at the bottom of Settings. Data: one <code>records</code> table; content is never modified. Editing soft-deletes the old row and inserts a new row with the same <code>entry_id</code> and time, so old content simply sits in the trash.</p>
+<div class="row">
+
+<!-- 1. Main -->
+<figure>
+<figcaption>1 · Main<small>Long messages clamp to 3 lines with “…”. Tap “LifeLog ›” to open Settings (trash is at the bottom there).</small></figcaption>
+<div class="phone">
+  <header>
+    <button type="button" aria-label="LifeLog，打开设置" style="flex-grow: 1; display: flex; align-items: center; gap: 4px; height: 44px; border: 0; background: transparent; padding: 0; font: inherit; font-size: 22px; font-weight: 600; color: var(--ink); text-align: left">LifeLog<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.4" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+    <span class="chip ok">✓ 已同步 18:42</span>
+    <button class="icon" aria-label="搜索"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
+  </header>
+  <main class="stream">
+    <div class="daypill">昨天 · 11月7日</div>
+    <div class="entry"><time>19:05</time><p>深蹲 80 公斤 5×5，最后一组膝盖有点紧</p></div>
+    <div class="entry"><time>22:10</time><p class="clamp">睡前想了一下 LifeLog 的同步：手机是唯一写入方，所以按天导出文件就够了，不需要合并逻辑。CyberMnema 每天读一次远端目录，把训练相关的内容整理进 health，其余的按主题归档，原始记录始终保留，方便以后回查。</p></div>
+    <div class="daypill">今天 · 11月8日</div>
+    <div class="entry"><time>18:20</time><p>开始练胸</p></div>
+    <div class="entry"><time>18:32</time><p>卧推，60 公斤，10 次</p></div>
+    <div class="entry"><time>18:35</time><p>同样重量，8 次</p></div>
+    <div class="entry"><time>18:38</time><p>这组只有 7 次，最后一下有点勉强</p></div>
+    <div class="entry"><time>18:41</time><p>突然想到，搜索结果可以直接跳到当天上下文</p></div>
+  </main>
+  <form class="composer">
+    <label class="sr" for="c1">新记录</label>
+    <textarea id="c1" rows="1" placeholder="记一句……"></textarea>
+    <button class="primary" type="button">发送</button>
+  </form>
+</div>
+</figure>
+
+<!-- 2. Multi-select -->
+<figure>
+<figcaption>2 · Long-press → multi-select<small>Tap more rows to add. Delete = soft delete of every version → trash.</small></figcaption>
+<div class="phone">
+  <header class="back" style="background: var(--accent-soft)">
+    <button class="icon" aria-label="退出选择">✕</button>
+    <h2 style="font-size: 18px">已选 2 条</h2>
+    <button class="textbtn" type="button">全选</button>
+  </header>
+  <main class="stream">
+    <div class="daypill">今天 · 11月8日</div>
+    <label class="entry" style="align-items: center"><input type="checkbox"><time>18:20</time><span class="text">开始练胸</span></label>
+    <label class="entry" style="align-items: center"><input type="checkbox"><time>18:32</time><span class="text">卧推，60 公斤，10 次</span></label>
+    <label class="entry sel" style="align-items: center"><input type="checkbox" checked><time>18:35</time><span class="text">同样重量，8 次</span></label>
+    <label class="entry sel" style="align-items: center"><input type="checkbox" checked><time>18:36</time><span class="text">同样重量，8 次</span></label>
+    <label class="entry" style="align-items: center"><input type="checkbox"><time>18:38</time><span class="text">这组只有 7 次，最后一下有点勉强</span></label>
+    <label class="entry" style="align-items: center"><input type="checkbox"><time>18:41</time><span class="text">突然想到，搜索结果可以直接跳到当天上下文</span></label>
+  </main>
+  <footer class="bar"><button class="danger-fill" type="button">删除 2 条（移到回收站）</button></footer>
+</div>
+</figure>
+
+<!-- 3. Double-tap sheet -->
+<figure>
+<figcaption>3 · Double-tap → detail sheet<small>Mainly for reading. Small icons bottom-right, top to bottom: full screen · edit · delete. Swipe down or tap outside to close.</small></figcaption>
+<div class="phone">
+  <header>
+    <button type="button" aria-label="LifeLog，打开设置" style="flex-grow: 1; display: flex; align-items: center; gap: 4px; height: 44px; border: 0; background: transparent; padding: 0; font: inherit; font-size: 22px; font-weight: 600; color: var(--ink); text-align: left">LifeLog<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.4" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+    <span class="chip ok">✓ 已同步 18:42</span>
+  </header>
+  <main class="stream" style="justify-content: flex-start">
+    <div class="daypill">昨天 · 11月7日</div>
+    <div class="entry"><time>19:05</time><p>深蹲 80 公斤 5×5，最后一组膝盖有点紧</p></div>
+    <div class="entry focus"><time>22:10</time><p class="clamp">睡前想了一下 LifeLog 的同步：手机是唯一写入方，所以按天导出文件就够了，不需要合并逻辑。</p></div>
+  </main>
+  <div class="scrim"></div>
+  <div class="sheet" role="dialog" aria-label="记录详情" style="height: 560px">
+    <span class="grabber"></span>
+    <div class="meta"><span>11月7日 周六 22:10</span></div>
+    <div style="flex-grow: 1; display: flex; gap: 8px; min-height: 0">
+      <p class="longtext" style="flex-grow: 1; overflow: hidden">睡前想了一下 LifeLog 的同步：手机是唯一写入方，所以按天导出文件就够了，不需要合并逻辑。CyberMnema 每天读一次远端目录，把训练相关的内容整理进 health，其余的按主题归档，原始记录始终保留，方便以后回查。
+
+另外，删除要先进回收站，保留 7 天再清理。</p>
+      <div style="align-self: flex-end; display: flex; flex-direction: column; gap: 10px; flex-shrink: 0">
+        <button type="button" aria-label="全屏查看" style="width: 44px; height: 44px; border: 1px solid #C9CFC8; border-radius: 50%; background: var(--surface); display: flex; align-items: center; justify-content: center; color: var(--ink)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+        <button type="button" aria-label="编辑" style="width: 44px; height: 44px; border: 1px solid #C9CFC8; border-radius: 50%; background: var(--surface); display: flex; align-items: center; justify-content: center; color: var(--accent)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></svg></button>
+        <button type="button" aria-label="删除" style="width: 44px; height: 44px; border: 1px solid #C9CFC8; border-radius: 50%; background: var(--surface); display: flex; align-items: center; justify-content: center; color: var(--danger)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>
+      </div>
+    </div>
+  </div>
+</div>
+</figure>
+
+<!-- 3b. Delete confirm -->
+<figure>
+<figcaption>3b · Delete from the sheet<small>Confirm first; the record moves to the trash.</small></figcaption>
+<div class="phone">
+  <header>
+    <button type="button" aria-label="LifeLog，打开设置" style="flex-grow: 1; display: flex; align-items: center; gap: 4px; height: 44px; border: 0; background: transparent; padding: 0; font: inherit; font-size: 22px; font-weight: 600; color: var(--ink); text-align: left">LifeLog<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.4" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+    <span class="chip ok">✓ 已同步 18:42</span>
+  </header>
+  <main class="stream" style="justify-content: flex-start">
+    <div class="daypill">昨天 · 11月7日</div>
+    <div class="entry"><time>19:05</time><p>深蹲 80 公斤 5×5，最后一组膝盖有点紧</p></div>
+    <div class="entry focus"><time>22:10</time><p class="clamp">睡前想了一下 LifeLog 的同步：手机是唯一写入方，所以按天导出文件就够了，不需要合并逻辑。</p></div>
+  </main>
+  <div class="scrim"></div>
+  <div role="alertdialog" aria-labelledby="del-title" style="position: absolute; left: 24px; right: 24px; top: 300px; background: var(--surface); border-radius: 18px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+    <h3 id="del-title" style="margin: 0; font-size: 17px">删除这条记录？</h3>
+    <p style="margin: 0; font-size: 14px; line-height: 1.5; color: var(--muted)">11月7日 22:10 的记录会移到回收站，7 天内可以恢复。</p>
+    <div style="display: flex; gap: 8px; justify-content: flex-end">
+      <button class="secondary" type="button">取消</button>
+      <button type="button" style="height: 40px; border: 0; border-radius: 10px; background: var(--danger); color: #fff; font: inherit; font-size: 14px; font-weight: 600; padding: 0 16px">删除</button>
+    </div>
+  </div>
+</div>
+</figure>
+
+<!-- 4. Full-screen detail -->
+<figure id="full">
+<figcaption>4 · Full-screen view<small>Opened by 全屏查看. Reading only, with 编辑 / 删除 in the header for convenience.</small></figcaption>
+<div class="phone">
+  <header class="back">
+    <button class="icon" aria-label="返回"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg></button>
+    <h2 style="font-size: 17px">11月7日 周六 22:10</h2>
+    <button class="textbtn" type="button">编辑</button>
+    <button class="textbtn danger-text" type="button">删除</button>
+  </header>
+  <main style="gap: 16px; padding: 20px 20px">
+    <p class="longtext">睡前想了一下 LifeLog 的同步：手机是唯一写入方，所以按天导出文件就够了，不需要合并逻辑。CyberMnema 每天读一次远端目录，把训练相关的内容整理进 health，其余的按主题归档，原始记录始终保留，方便以后回查。
+
+另外，删除要先进回收站，保留 7 天再清理。</p>
+  </main>
+</div>
+</figure>
+
+<!-- 5. Full-screen edit -->
+<figure>
+<figcaption>5 · Editing (from the sheet or full-screen view)<small>Time stays 18:38. No autosave: only 保存 writes a row. Unchanged text saves nothing.</small></figcaption>
+<div class="phone">
+  <header class="back">
+    <button class="icon" aria-label="返回"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg></button>
+    <h2 style="font-size: 17px">编辑 · 11月8日 18:38</h2>
+    <button class="primary" type="button" style="height: 40px; margin-right: 4px">保存</button>
+  </header>
+  <main style="padding-top: 16px; gap: 10px">
+    <label class="sr" for="ed">内容</label>
+    <textarea id="ed" style="flex-grow: 1; border: 1px solid var(--accent); border-radius: 14px; outline: none; resize: none; font: inherit; font-size: 17px; line-height: 1.6; padding: 14px; background: var(--surface); color: var(--ink)">这组只有 7 次，最后一下有点勉强，下次降到 57.5</textarea>
+    <p class="hint">保存后，原内容移到回收站，需要时可以从那里恢复。</p>
+  </main>
+</div>
+</figure>
+
+<!-- 5b. Leave prompt -->
+<figure>
+<figcaption>5b · Leaving with unsaved changes<small>Back arrow, system back or swipe-back all show this.</small></figcaption>
+<div class="phone">
+  <header class="back">
+    <button class="icon" aria-label="返回"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg></button>
+    <h2 style="font-size: 17px">编辑 · 11月8日 18:38</h2>
+    <button class="primary" type="button" style="height: 40px; margin-right: 4px">保存</button>
+  </header>
+  <main style="padding-top: 16px; gap: 10px">
+    <textarea aria-label="内容" style="flex-grow: 1; border: 1px solid var(--accent); border-radius: 14px; outline: none; resize: none; font: inherit; font-size: 17px; line-height: 1.6; padding: 14px; background: var(--surface); color: var(--ink)">这组只有 7 次，最后一下有点勉强，下次降到 57.5</textarea>
+  </main>
+  <div class="scrim"></div>
+  <div role="dialog" aria-labelledby="lv-title" style="position: absolute; left: 24px; right: 24px; top: 280px; background: var(--surface); border-radius: 18px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+    <h3 id="lv-title" style="margin: 0; font-size: 17px">保存修改？</h3>
+    <p style="margin: 0; font-size: 14px; line-height: 1.5; color: var(--muted)">内容已修改。保存后，原内容移到回收站。</p>
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <button class="primary" type="button" style="height: 44px">保存</button>
+      <button class="secondary danger-text" type="button" style="height: 44px">不保存，直接离开</button>
+      <button class="secondary" type="button" style="height: 44px">继续编辑</button>
+    </div>
+  </div>
+</div>
+</figure>
+
+<!-- 6. Trash -->
+<figure>
+<figcaption>6 · Trash, grouped by message<small>Search box on top (substring match on trashed text). Each card is one message. If it still has current text, that is shown on top for reference (not selectable); older texts are listed newest first.</small></figcaption>
+<div class="phone">
+  <header class="back">
+    <button class="icon" aria-label="返回"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg></button>
+    <h2>回收站</h2>
+    <button class="textbtn" type="button">全选</button>
+  </header>
+  <main style="gap: 12px; overflow: hidden">
+    <label class="sr" for="tq">搜索回收站</label>
+    <div style="display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid #D5D9D4; border-radius: 12px; padding: 0 12px; height: 44px; flex-shrink: 0">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="tq" placeholder="搜索回收站里的内容" style="flex-grow: 1; border: 0; outline: none; font: inherit; font-size: 15px; background: transparent; color: var(--ink)">
+    </div>
+    <p class="hint">删除 7 天后自动永久清除（可在设置中修改）。</p>
+
+    <section class="card" style="padding: 0; overflow: hidden">
+      <div style="display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid #EDEFEC">
+        <input type="checkbox" aria-label="选中这条记录的全部内容">
+        <b style="font-size: 14px; flex-grow: 1">11月8日 18:38 的记录</b>
+        <span class="kind">已编辑 2 次</span>
+      </div>
+      <div style="padding: 8px 14px 8px 46px; background: var(--ground); font-size: 13px; color: var(--muted); line-height: 1.45">
+        <span style="font-size: 11px; font-weight: 600; color: var(--ok)">当前</span> 这组只有 7 次，最后一下有点勉强，下次降到 57.5
+      </div>
+      <label class="trow sel"><input type="checkbox" checked>
+        <span class="body"><span class="tmeta"><span>保存于 18:52</span><span class="left">剩 7 天</span></span><span class="vtext">这组只有 7 次，最后一下有点勉强</span></span></label>
+      <label class="trow"><input type="checkbox">
+        <span class="body"><span class="tmeta"><span>原始 · 18:38</span><span class="left">剩 7 天</span></span><span class="vtext">这组只有7次，最后一下有点免强</span></span></label>
+    </section>
+
+    <section class="card" style="padding: 0; overflow: hidden">
+      <div style="display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid #EDEFEC">
+        <input type="checkbox" aria-label="选中这条记录的全部内容">
+        <b style="font-size: 14px; flex-grow: 1">11月8日 18:36 的记录</b>
+        <span class="kind" style="color: var(--danger)">整条已删除</span>
+      </div>
+      <label class="trow"><input type="checkbox">
+        <span class="body"><span class="tmeta"><span>原始 · 18:36</span><span class="left">剩 7 天</span></span><span class="vtext">同样重量，8 次</span></span></label>
+    </section>
+
+    <section class="card" style="padding: 0; overflow: hidden">
+      <div style="display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid #EDEFEC">
+        <input type="checkbox" aria-label="选中这条记录的全部内容">
+        <b style="font-size: 14px; flex-grow: 1">11月6日 08:15 的记录</b>
+        <span class="kind" style="color: var(--danger)">整条已删除</span>
+      </div>
+      <label class="trow"><input type="checkbox">
+        <span class="body"><span class="tmeta"><span>保存于 08:20</span><span class="left">剩 5 天</span></span><span class="vtext">早上体重 71.2</span></span></label>
+      <label class="trow"><input type="checkbox">
+        <span class="body"><span class="tmeta"><span>原始 · 08:15</span><span class="left">剩 5 天</span></span><span class="vtext">早上体重 712</span></span></label>
+    </section>
+  </main>
+  <footer class="bar">
+    <button class="secondary" type="button" style="flex: 1; height: 48px">恢复</button>
+    <button class="danger-fill" type="button" style="flex: 1">永久删除 1 项</button>
+  </footer>
+</div>
+</figure>
+
+<!-- 6b. Restore prompt -->
+<figure>
+<figcaption>6b · Restore over current text<small>Only when the message still has current text. Current text moves to the trash, so this is reversible.</small></figcaption>
+<div class="phone">
+  <header class="back">
+    <button class="icon" aria-label="返回"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg></button>
+    <h2>回收站</h2>
+  </header>
+  <main></main>
+  <div class="scrim"></div>
+  <div role="dialog" aria-labelledby="ow-title" style="position: absolute; left: 24px; right: 24px; top: 240px; background: var(--surface); border-radius: 18px; padding: 20px; display: flex; flex-direction: column; gap: 12px">
+    <h3 id="ow-title" style="margin: 0; font-size: 17px">覆盖当前内容？</h3>
+    <p style="margin: 0; font-size: 14px; line-height: 1.5; color: var(--muted)">这是 11月8日 18:38 那条记录编辑前的内容。恢复后替换当前内容，当前内容移到回收站。</p>
+    <div style="padding: 10px 12px; background: var(--ground); border-radius: 10px; font-size: 14px; line-height: 1.5">
+      <div style="color: var(--muted); font-size: 12px">当前</div>这组只有 7 次，最后一下有点勉强，下次降到 57.5
+      <div style="color: var(--muted); font-size: 12px; margin-top: 8px">恢复为</div>这组只有 7 次，最后一下有点勉强
+    </div>
+    <div style="display: flex; gap: 8px; justify-content: flex-end">
+      <button class="secondary" type="button">取消</button>
+      <button class="primary" type="button" style="height: 40px">覆盖</button>
+    </div>
+  </div>
+</div>
+</figure>
+
+<!-- 7. Search -->
+<figure>
+<figcaption>7 · Search<small>Substring match (LIKE) on live records only; grey lines are context.</small></figcaption>
+<div class="phone">
+  <header class="back">
+    <button class="icon" aria-label="返回"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg></button>
+    <label class="sr" for="q">搜索记录</label>
+    <div style="flex-grow: 1; display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--accent); border-radius: 12px; padding: 0 12px; height: 44px; margin-right: 4px">
+      <input id="q" value="卧推" style="flex-grow: 1; border: 0; outline: none; font: inherit; font-size: 16px; background: transparent">
+      <span style="color: var(--muted)">✕</span>
+    </div>
+  </header>
+  <main style="gap: 12px">
+    <p class="hint" style="font-size: 13px">3 天 · 4 条匹配 · 最新在前</p>
+    <section class="card" style="padding: 10px 0 4px">
+      <div style="display: flex; align-items: center; padding: 0 14px 4px"><h3 class="day" style="margin: 0; flex-grow: 1">今天 · 11月8日</h3><a href="#" style="font-size: 13px; color: var(--accent); text-decoration: none">查看当天 ›</a></div>
+      <div class="entry"><time>18:32</time><p><mark>卧推</mark>，60 公斤，10 次</p></div>
+      <div class="entry ctx"><time>18:35</time><p>同样重量，8 次</p></div>
+    </section>
+    <section class="card" style="padding: 10px 0 4px">
+      <div style="display: flex; align-items: center; padding: 0 14px 4px"><h3 class="day" style="margin: 0; flex-grow: 1">11月5日 周三</h3><a href="#" style="font-size: 13px; color: var(--accent); text-decoration: none">查看当天 ›</a></div>
+      <div class="entry"><time>19:12</time><p><mark>卧推</mark> 57.5 公斤，10 次</p></div>
+      <div class="entry"><time>19:16</time><p><mark>卧推</mark> 57.5，9 次，换了握距</p></div>
+      <div class="entry ctx"><time>19:20</time><p>8 次，力竭</p></div>
+    </section>
+    <section class="card" style="padding: 10px 0 4px">
+      <div style="display: flex; align-items: center; padding: 0 14px 4px"><h3 class="day" style="margin: 0; flex-grow: 1">11月1日 周六</h3><a href="#" style="font-size: 13px; color: var(--accent); text-decoration: none">查看当天 ›</a></div>
+      <div class="entry"><time>10:05</time><p>上斜<mark>卧推</mark> 20 公斤哑铃，12 次</p></div>
+    </section>
+  </main>
+</div>
+</figure>
+
+<!-- 8. Settings -->
+<figure>
+<figcaption>8 · Settings<small>Opened by tapping “LifeLog ›”. Trash entry and its auto-cleanup (default 7 days) at the bottom.</small></figcaption>
+<div class="phone">
+  <header class="back">
+    <button class="icon" aria-label="返回"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg></button>
+    <h2>设置</h2>
+  </header>
+  <main style="gap: 16px">
+    <section class="group">
+      <h3 class="day" style="margin-bottom: 0">同步</h3>
+      <div class="card" style="padding: 12px 14px; display: flex; align-items: center; gap: 10px">
+        <span style="width: 10px; height: 10px; border-radius: 50%; background: #1E8A4C; flex-shrink: 0"></span>
+        <span style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px">
+          <span style="font-size: 15px; font-weight: 500">上次成功 · 今天 18:42</span>
+          <span style="font-size: 12px; color: var(--muted)">远端 nas.local/dav/lifelog</span>
+        </span>
+        <button class="secondary" type="button">立即同步</button>
+      </div>
+      <div class="card" style="padding: 2px 14px">
+        <div class="field"><label for="u">WebDAV 地址</label><input id="u" value="https://nas.local/dav/lifelog"></div>
+        <div class="field"><label for="n">用户名</label><input id="n" value="linguanguo"></div>
+        <div class="field"><label for="p">密码 / 应用密码</label><input id="p" type="password" value="placeholder"></div>
+      </div>
+      <div class="card" style="padding: 0 14px">
+        <label class="toggle"><span>打开 App 时同步</span><input type="checkbox" checked></label>
+        <label class="toggle"><span>新记录后在后台同步</span><input type="checkbox" checked></label>
+      </div>
+    </section>
+    <section class="group">
+      <h3 class="day" style="margin-bottom: 0">回收站</h3>
+      <div class="card" style="padding: 12px 14px; display: flex; flex-direction: column; gap: 10px">
+        <span style="font-size: 15px">自动清除已删除超过</span>
+        <div class="seg" role="group" aria-label="自动清除时间">
+          <button type="button" aria-pressed="false">1 天</button>
+          <button type="button" aria-pressed="true">7 天</button>
+          <button type="button" aria-pressed="false">30 天</button>
+          <button type="button" aria-pressed="false">从不</button>
+        </div>
+      </div>
+      <a href="#trash" class="card" style="display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 0 14px; text-decoration: none; color: var(--ink)">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>
+        <span style="flex-grow: 1; font-size: 16px; font-weight: 500">回收站</span>
+        <span style="color: var(--muted)">4 项 ›</span>
+      </a>
+    </section>
+  </main>
+</div>
+</figure>
+
+</div>
+</body>
+</html>

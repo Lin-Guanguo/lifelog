@@ -1,0 +1,36 @@
+{
+  "name": "lifelog",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/copy-wasm.mjs && vite",
+    "build": "node scripts/copy-wasm.mjs && vue-tsc -b && vite build",
+    "preview": "vite preview",
+    "android": "pnpm build && cap sync android",
+    "test": "vitest run src",
+    "e2e": "playwright test"
+  },
+  "dependencies": {
+    "@capacitor-community/sqlite": "8.1.1",
+    "@capacitor/android": "8.6.0",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "8.6.0",
+    "@capacitor/preferences": "8.0.1",
+    "jeep-sqlite": "2.8.0",
+    "vue": "^3.5.44"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.6.0",
+    "@playwright/test": "^1.65.0",
+    "@types/node": "^24.19.2",
+    "@types/sql.js": "^1.4.11",
+    "@vitejs/plugin-vue": "^6.0.10",
+    "@vue/tsconfig": "^0.9.1",
+    "sql.js": "1.12.0",
+    "typescript": "~6.0.3",
+    "vite": "^8.3.6",
+    "vitest": "^5.1.0",
+    "vue-tsc": "^3.3.14"
+  }
+}

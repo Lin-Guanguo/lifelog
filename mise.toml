@@ -1,0 +1,9 @@
+[tools]
+node = "24"
+pnpm = "12"
+java = "temurin-21"
+android-sdk = "23.0"
+
+[tasks.android-setup]
+description = "Install the Android SDK packages the Capacitor template needs"
+run = "yes | sdkmanager --licenses > /dev/null && sdkmanager 'platform-tools' 'platforms;android-36' 'build-tools;35.0.0'"

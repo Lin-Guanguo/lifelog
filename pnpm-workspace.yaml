@@ -1,0 +1,3 @@
+overrides:
+  # jeep-sqlite bundles sql.js 1.12 JS glue; the wasm it loads must be the same version.
+  sql.js: 1.12.0

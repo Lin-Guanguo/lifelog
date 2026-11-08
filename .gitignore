@@ -1,0 +1,31 @@
+# Dependencies and build output
+node_modules/
+dist/
+dist-ssr/
+
+# Generated: copied from sql.js by scripts/copy-wasm.mjs
+public/assets/sql-wasm.wasm
+
+# Local APK copies (build output lives under android/app/build/)
+release/
+
+# Tests
+test-results/
+playwright-report/
+
+# Native platforms: android/.gitignore and ios/.gitignore (created by `cap add`)
+# cover their build output. Signing material never belongs in the repo.
+*.keystore
+*.jks
+*.p12
+*.mobileprovision
+
+# Environment and editors
+.env
+.env.*
+*.local
+*.log
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
