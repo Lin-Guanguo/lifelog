@@ -74,7 +74,7 @@ test('v1 acceptance flow', async ({ page }) => {
   await entry(page, '开始练胸').click()
   await sheet.getByRole('button', { name: '删除' }).click()
   const confirmDelete = page.getByRole('alertdialog', { name: '删除这条记录？' })
-  await expect(confirmDelete).toContainText('7 天内可以恢复')
+  await expect(confirmDelete).toContainText('7天内可以恢复')
   await confirmDelete.getByRole('button', { name: '删除' }).click()
   await expect(entry(page, '开始练胸')).toHaveCount(0)
 
@@ -101,7 +101,7 @@ test('v1 acceptance flow', async ({ page }) => {
   await expect(page.locator('.group')).toHaveCount(4)
   await expect(page.locator('.group', { hasText: '同样重量，8 词' })).toContainText('有当前内容')
   await expect(page.locator('.group', { hasText: '开始练胸' })).toContainText('整条已删除')
-  await expect(page.locator('.trow').first()).toContainText('剩 7 天')
+  await expect(page.locator('.trow').first()).toContainText('还剩7天')
 
   // Trash search
   await page.getByRole('searchbox', { name: '搜索回收站' }).fill('8 词')
@@ -140,8 +140,22 @@ test('v1 acceptance flow', async ({ page }) => {
 
   // Settings: retention and language
   await page.getByRole('button', { name: 'LifeLog，打开设置' }).click()
-  await page.getByRole('button', { name: '30 天' }).click()
-  await expect(page.getByRole('button', { name: '30 天' })).toHaveAttribute('aria-pressed', 'true')
+  const retention = page.getByRole('group', { name: '自动清除时间' })
+  await retention.getByRole('button', { name: '30天' }).click()
+  await expect(retention.getByRole('button', { name: '30天' })).toHaveAttribute('aria-pressed', 'true')
+  // Custom: 12 hours
+  await retention.getByRole('button', { name: '自定义' }).click()
+  const customDialog = page.getByRole('alertdialog', { name: '自定义清除时间' })
+  await customDialog.getByLabel('时长').fill('12')
+  await customDialog.getByRole('button', { name: '小时' }).click()
+  await customDialog.getByRole('button', { name: '保存' }).click()
+  await expect(retention.getByRole('button', { name: '自定义' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByText('当前：12小时')).toBeVisible()
+  // Custom: never
+  await retention.getByRole('button', { name: '自定义' }).click()
+  await customDialog.getByLabel('永不自动清除').check()
+  await customDialog.getByRole('button', { name: '保存' }).click()
+  await expect(page.getByText('当前：从不')).toBeVisible()
   await page.getByRole('button', { name: 'English' }).click()
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible()
   await page.getByRole('button', { name: 'Back' }).click()

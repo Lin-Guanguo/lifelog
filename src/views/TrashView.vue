@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useBackHandler } from '../back'
-import { daysLeft, type LogRecord } from '../data/records'
-import { dateOf, timeOf } from '../format'
+import { timeLeft, type LogRecord } from '../data/records'
+import { dateOf, formatRemaining, formatHours, timeOf } from '../format'
 import { t } from '../i18n'
-import { closeScreen, db, reloadLive, retentionDays } from '../store'
+import { closeScreen, db, reloadLive, retentionHours } from '../store'
 import AppIcon from '../components/AppIcon.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import HighlightText from '../components/HighlightText.vue'
@@ -87,8 +87,9 @@ function rowLabel(row: LogRecord): string {
     : t('trash.savedAt', { date: dateOf(row.written_at), time: timeOf(row.written_at) })
 }
 
-function rowDaysLeft(row: LogRecord): number | null {
-  return row.deleted_at === null ? null : daysLeft(row.deleted_at, retentionDays.value)
+function rowTimeLeft(row: LogRecord): string | null {
+  const ms = row.deleted_at === null ? null : timeLeft(row.deleted_at, retentionHours.value)
+  return ms === null ? null : formatRemaining(ms)
 }
 
 function askRestore() {
@@ -126,7 +127,7 @@ onMounted(load)
       <div class="search-field">
         <input v-model="query" type="search" enterkeyhint="search" :aria-label="t('trash.searchLabel')" :placeholder="t('trash.searchPlaceholder')">
       </div>
-      <p class="hint">{{ retentionDays > 0 ? t('trash.retentionHint', { days: retentionDays }) : t('trash.noCleanupHint') }}</p>
+      <p class="hint">{{ retentionHours > 0 ? t('trash.retentionHint', { duration: formatHours(retentionHours) }) : t('trash.noCleanupHint') }}</p>
       <p v-if="trashed.length === 0" class="empty">{{ query.trim() ? t('trash.noMatch') : t('trash.empty') }}</p>
 
       <section v-for="group in groups" :key="group.entryId" class="card group">
@@ -143,7 +144,7 @@ onMounted(load)
           <span class="trow-body">
             <span class="trow-meta">
               <span>{{ rowLabel(row) }}</span>
-              <span v-if="rowDaysLeft(row) !== null" class="left">{{ t('trash.daysLeft', { n: rowDaysLeft(row)! }) }}</span>
+              <span v-if="rowTimeLeft(row) !== null" class="left">{{ t('trash.left', { duration: rowTimeLeft(row)! }) }}</span>
             </span>
             <span class="trow-text"><HighlightText :text="row.content" :query="query.trim()" /></span>
           </span>

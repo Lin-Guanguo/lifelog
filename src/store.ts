@@ -3,7 +3,7 @@ import type { LogRecord, Records } from './data/records'
 
 let records: Records
 export const liveRecords = ref<LogRecord[]>([])
-export const retentionDays = ref(7)
+export const retentionHours = ref(7 * 24) // 0 = never clear
 
 export function setRecords(r: Records): void {
   records = r

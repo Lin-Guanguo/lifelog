@@ -2,9 +2,9 @@
 import { ref } from 'vue'
 import { useBackHandler } from '../back'
 import type { LogRecord } from '../data/records'
-import { dateOf, timeOf } from '../format'
+import { dateOf, formatHours, timeOf } from '../format'
 import { t } from '../i18n'
-import { db, openScreen, reloadLive, retentionDays } from '../store'
+import { db, openScreen, reloadLive, retentionHours } from '../store'
 import AppIcon from './AppIcon.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
 
@@ -48,7 +48,7 @@ async function remove() {
       </div>
     </div>
     <ConfirmDialog v-if="confirming" :title="t('delete.title')"
-      :message="retentionDays > 0 ? t('delete.message', { days: retentionDays }) : t('delete.messageNoCleanup')"
+      :message="retentionHours > 0 ? t('delete.message', { duration: formatHours(retentionHours) }) : t('delete.messageNoCleanup')"
       @cancel="confirming = false">
       <template #actions>
         <button class="secondary" type="button" @click="confirming = false">{{ t('common.cancel') }}</button>

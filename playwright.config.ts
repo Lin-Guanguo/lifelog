@@ -13,9 +13,16 @@ export default defineConfig({
     // Lets a locally cached Chromium be used instead of downloading the pinned one.
     launchOptions: { executablePath: process.env.PW_CHROMIUM_PATH || undefined },
   },
-  webServer: {
-    command: 'pnpm exec vite --port 5199 --strictPort',
-    url: 'http://localhost:5199',
-    reuseExistingServer: false,
-  },
+  webServer: [
+    {
+      command: 'pnpm exec vite --port 5199 --strictPort',
+      url: 'http://localhost:5199',
+      reuseExistingServer: false,
+    },
+    {
+      command: 'node test-support/webdav-server.ts 5300',
+      port: 5300,
+      reuseExistingServer: false,
+    },
+  ],
 })

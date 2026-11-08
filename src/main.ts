@@ -1,18 +1,20 @@
 import { createApp } from 'vue'
 import App from './App.vue'
+import { getLocalePreference, getRetentionHours } from './data/preferences'
 import { openRecords } from './data/sqlite'
 import { localePreference, t } from './i18n'
-import { getLocalePreference, getRetentionDays } from './data/preferences'
-import { reloadLive, retentionDays, setRecords } from './store'
+import { reloadLive, retentionHours, setRecords } from './store'
+import { loadSync, noteChange } from './sync/controller'
 import './style.css'
 
 async function start() {
   localePreference.value = await getLocalePreference()
   try {
-    const records = await openRecords()
+    await loadSync()
+    const records = await openRecords(noteChange)
     setRecords(records)
-    retentionDays.value = await getRetentionDays()
-    await records.purgeExpired(retentionDays.value)
+    retentionHours.value = await getRetentionHours()
+    await records.purgeExpired(retentionHours.value)
     await reloadLive()
   } catch (error) {
     document.getElementById('app')!.textContent = t('app.dbError', { error: String(error) })

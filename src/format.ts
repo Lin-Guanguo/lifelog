@@ -36,3 +36,23 @@ export function groupByDay<T extends { logged_at: number }>(rows: T[]): { key: s
   }
   return groups
 }
+
+function unit(n: number, unit: 'minute' | 'hour' | 'day'): string {
+  return new Intl.NumberFormat(locale.value, { style: 'unit', unit, unitDisplay: 'long' }).format(n)
+}
+
+// A configured duration: whole days when it divides evenly, otherwise hours.
+export function formatHours(hours: number): string {
+  return hours % 24 === 0 ? unit(hours / 24, 'day') : unit(hours, 'hour')
+}
+
+export function formatMinutes(minutes: number): string {
+  if (minutes % (24 * 60) === 0) return unit(minutes / (24 * 60), 'day')
+  return minutes % 60 === 0 ? unit(minutes / 60, 'hour') : unit(minutes, 'minute')
+}
+
+// Time remaining, rounded up: days when at least a day is left, otherwise hours.
+export function formatRemaining(ms: number): string {
+  const hours = Math.ceil(ms / 3_600_000)
+  return hours >= 24 ? unit(Math.ceil(hours / 24), 'day') : unit(hours, 'hour')
+}

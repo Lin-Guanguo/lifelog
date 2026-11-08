@@ -15,26 +15,14 @@ export interface Statement {
 // Minimal SQL surface, implemented by the Capacitor plugin in the app and by sql.js in tests.
 export interface Executor {
   query(sql: string, values?: unknown[]): Promise<Record<string, unknown>[]>
-  // Runs all statements in one transaction.
-  run(statements: Statement[]): Promise<void>
+  // Runs all parameterized statements in one transaction; resolves to the number of changed rows.
+  run(statements: Statement[]): Promise<number>
+  // Runs plain SQL statements (DDL, PRAGMA) in one transaction.
+  exec(statements: string[]): Promise<void>
 }
 
-// One row per saved text. Content is never modified: an edit soft-deletes the old row
-// and inserts a new one with the same entry_id and logged_at.
-export const SCHEMA = `
-CREATE TABLE IF NOT EXISTS records (
-  id          TEXT PRIMARY KEY,
-  entry_id    TEXT NOT NULL,
-  logged_at   INTEGER NOT NULL,
-  content     TEXT NOT NULL,
-  written_at  INTEGER NOT NULL,
-  deleted_at  INTEGER
-);
-CREATE UNIQUE INDEX IF NOT EXISTS records_one_live ON records(entry_id) WHERE deleted_at IS NULL;
-CREATE INDEX IF NOT EXISTS records_timeline ON records(logged_at) WHERE deleted_at IS NULL;
-`
-
-export const DAY_MS = 86_400_000
+export const HOUR_MS = 3_600_000
+export const DAY_MS = 24 * HOUR_MS
 
 const INSERT = 'INSERT INTO records (id, entry_id, logged_at, content, written_at) VALUES (?, ?, ?, ?, ?)'
 
@@ -125,11 +113,37 @@ export function createRecords(
       }])
     },
 
-    async purgeExpired(retentionDays: number): Promise<void> {
-      if (retentionDays <= 0) return
+    // Every row, live and trashed, for snapshots.
+    all(): Promise<LogRecord[]> {
+      return select('SELECT * FROM records ORDER BY logged_at, written_at')
+    },
+
+    // Merges another copy of the log. Rows are immutable except deleted_at, so:
+    // rows missing here are added, a deletion on either side wins, and a row that would give an
+    // entry a second live text (edited on both sides) is added to the trash instead of being lost.
+    // Resolves to true when local data changed.
+    async merge(rows: LogRecord[]): Promise<boolean> {
+      if (rows.length === 0) return false
+      const t = now()
+      const insert = 'INSERT OR IGNORE INTO records (id, entry_id, logged_at, content, written_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?)'
+      const deletions = rows.filter((r) => r.deleted_at !== null).map((r) => ({
+        statement: 'UPDATE records SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL',
+        values: [r.deleted_at, r.id],
+      }))
+      // The second insert only applies when the first was rejected by the one-live-row index.
+      const inserts = rows.flatMap((r) => [
+        { statement: insert, values: [r.id, r.entry_id, r.logged_at, r.content, r.written_at, r.deleted_at] },
+        { statement: insert, values: [r.id, r.entry_id, r.logged_at, r.content, r.written_at, r.deleted_at ?? t] },
+      ])
+      return (await db.run([...deletions, ...inserts])) > 0
+    },
+
+    // retentionHours <= 0 means never clear.
+    async purgeExpired(retentionHours: number): Promise<void> {
+      if (retentionHours <= 0) return
       await db.run([{
         statement: 'DELETE FROM records WHERE deleted_at IS NOT NULL AND deleted_at < ?',
-        values: [now() - retentionDays * DAY_MS],
+        values: [now() - retentionHours * HOUR_MS],
       }])
     },
   }
@@ -137,7 +151,8 @@ export function createRecords(
 
 export type Records = ReturnType<typeof createRecords>
 
-export function daysLeft(deletedAt: number, retentionDays: number, now = Date.now()): number | null {
-  if (retentionDays <= 0) return null
-  return Math.max(0, Math.ceil((deletedAt + retentionDays * DAY_MS - now) / DAY_MS))
+// Milliseconds until a trashed row is cleared; null when cleanup is off.
+export function timeLeft(deletedAt: number, retentionHours: number, now = Date.now()): number | null {
+  if (retentionHours <= 0) return null
+  return Math.max(0, deletedAt + retentionHours * HOUR_MS - now)
 }

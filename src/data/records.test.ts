@@ -1,43 +1,23 @@
 import initSqlJs, { type Database } from 'sql.js'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { createRecords, DAY_MS, daysLeft, SCHEMA, type Executor, type Records } from './records'
+import { createRecords, DAY_MS, HOUR_MS, timeLeft, type Records } from './records'
+import { migrate } from './schema'
+import { sqlJsExecutor } from './sqljs'
 
 let sqlDb: Database
 let clock: number
 let records: Records
-
-function executor(db: Database): Executor {
-  return {
-    async query(sql, values = []) {
-      const stmt = db.prepare(sql)
-      stmt.bind(values as never[])
-      const rows: Record<string, unknown>[] = []
-      while (stmt.step()) rows.push(stmt.getAsObject())
-      stmt.free()
-      return rows
-    },
-    async run(statements) {
-      db.exec('BEGIN')
-      try {
-        for (const s of statements) db.run(s.statement, s.values as never[])
-        db.exec('COMMIT')
-      } catch (e) {
-        db.exec('ROLLBACK')
-        throw e
-      }
-    },
-  }
-}
 
 const tick = (ms = 1000) => { clock += ms }
 
 beforeEach(async () => {
   const SQL = await initSqlJs()
   sqlDb = new SQL.Database()
-  sqlDb.exec(SCHEMA)
   clock = Date.UTC(2026, 10, 8, 10, 0)
   let n = 0
-  records = createRecords(executor(sqlDb), () => clock, () => `id-${++n}`)
+  const executor = sqlJsExecutor(sqlDb)
+  await migrate(executor)
+  records = createRecords(executor, () => clock, () => `id-${++n}`)
 })
 
 describe('records', () => {
@@ -137,7 +117,7 @@ describe('records', () => {
 
     await records.purgeExpired(0)
     expect(await records.countTrash()).toBe(2)
-    await records.purgeExpired(7)
+    await records.purgeExpired(7 * 24)
     expect((await records.listTrash()).trashed.map((r) => r.content)).toEqual(['new'])
   })
 
@@ -167,12 +147,11 @@ describe('records', () => {
   })
 })
 
-describe('daysLeft', () => {
-  it('counts whole days remaining and is null when cleanup is off', () => {
-    const deleted = 0
-    expect(daysLeft(deleted, 7, 0)).toBe(7)
-    expect(daysLeft(deleted, 7, DAY_MS * 6.5)).toBe(1)
-    expect(daysLeft(deleted, 7, DAY_MS * 8)).toBe(0)
-    expect(daysLeft(deleted, 0, 0)).toBeNull()
+describe('timeLeft', () => {
+  it('counts down from the retention and is null when cleanup is off', () => {
+    expect(timeLeft(0, 7 * 24, 0)).toBe(7 * DAY_MS)
+    expect(timeLeft(0, 12, 3 * HOUR_MS)).toBe(9 * HOUR_MS)
+    expect(timeLeft(0, 24, 2 * DAY_MS)).toBe(0)
+    expect(timeLeft(0, 0, 0)).toBeNull()
   })
 })

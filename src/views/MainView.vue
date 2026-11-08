@@ -7,6 +7,7 @@ import { t } from '../i18n'
 import { db, liveRecords, openScreen, reloadLive } from '../store'
 import AppIcon from '../components/AppIcon.vue'
 import EntrySheet from '../components/EntrySheet.vue'
+import { sync } from '../sync/controller'
 
 const LONG_PRESS_MS = 500
 const MOVE_TOLERANCE_PX = 10
@@ -19,6 +20,13 @@ const selected = ref(new Set<string>())
 const selecting = computed(() => selected.value.size > 0)
 const days = computed(() => groupByDay(liveRecords.value))
 const allSelected = computed(() => selected.value.size === liveRecords.value.length)
+const syncChip = computed(() => {
+  if (!sync.settings) return null
+  if (sync.status === 'syncing') return { tone: '', label: t('sync.chipSyncing') }
+  if (sync.status === 'error') return { tone: 'bad', label: t('sync.chipError') }
+  if (sync.dirty || !sync.state.lastSyncAt) return { tone: 'pending', label: t('sync.chipPending') }
+  return { tone: 'ok', label: t('sync.chipSynced', { time: timeOf(sync.state.lastSyncAt) }) }
+})
 
 let removeSelectionBack: (() => void) | undefined
 watch(selecting, (on) => {
@@ -123,6 +131,9 @@ onMounted(scrollToBottom)
       <button class="brand" type="button" :aria-label="t('app.openSettings')" @click="openScreen({ name: 'settings' })">
         {{ t('app.name') }}<AppIcon name="chevron" :size="16" />
       </button>
+      <button v-if="syncChip" class="sync-chip" :class="syncChip.tone" type="button" @click="openScreen({ name: 'settings' })">
+        {{ syncChip.label }}
+      </button>
       <button class="icon-btn" type="button" :aria-label="t('main.search')" @click="openScreen({ name: 'search' })">
         <AppIcon name="search" />
       </button>
@@ -162,6 +173,11 @@ onMounted(scrollToBottom)
 .brand { flex-grow: 1; display: flex; align-items: center; gap: 4px; height: 44px; border: 0; background: transparent; padding: 0;
   font-size: 22px; font-weight: 600; text-align: left; }
 .brand :deep(svg) { color: var(--muted); }
+.sync-chip { flex-shrink: 0; height: 30px; border: 0; border-radius: 999px; padding: 0 10px; font-size: 12px;
+  background: var(--chip); color: var(--muted); }
+.sync-chip.ok { color: var(--ok); }
+.sync-chip.pending { color: var(--warn); background: var(--warn-soft); }
+.sync-chip.bad { color: var(--danger); }
 .stream { display: flex; flex-direction: column; }
 .stream > :first-child { margin-top: auto; }
 </style>

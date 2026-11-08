@@ -8,7 +8,8 @@ import RecordView from './views/RecordView.vue'
 import SearchView from './views/SearchView.vue'
 import SettingsView from './views/SettingsView.vue'
 import TrashView from './views/TrashView.vue'
-import { db, reloadLive, retentionDays, screens } from './store'
+import { db, reloadLive, retentionHours, screens } from './store'
+import { autoSync, startAutoSync } from './sync/controller'
 
 const removers: (() => void)[] = []
 
@@ -16,12 +17,13 @@ onMounted(async () => {
   const back = await CapApp.addListener('backButton', () => {
     if (!handleBack()) CapApp.exitApp()
   })
-  // Cleanup also runs when the app returns to the foreground after a long pause.
+  // Cleanup and sync also run when the app returns to the foreground after a pause.
   const resume = await CapApp.addListener('resume', async () => {
-    await db().purgeExpired(retentionDays.value)
+    await db().purgeExpired(retentionHours.value)
     await reloadLive()
+    autoSync()
   })
-  removers.push(() => back.remove(), () => resume.remove())
+  removers.push(() => back.remove(), () => resume.remove(), startAutoSync())
 })
 onUnmounted(() => removers.forEach((r) => r()))
 </script>

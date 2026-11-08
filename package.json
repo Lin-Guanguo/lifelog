@@ -18,7 +18,8 @@
     "@capacitor/core": "8.6.0",
     "@capacitor/preferences": "8.0.1",
     "jeep-sqlite": "2.8.0",
-    "vue": "^3.5.44"
+    "vue": "^3.5.44",
+    "sql.js": "1.12.0"
   },
   "devDependencies": {
     "@capacitor/cli": "8.6.0",
@@ -27,7 +28,6 @@
     "@types/sql.js": "^1.4.11",
     "@vitejs/plugin-vue": "^6.0.10",
     "@vue/tsconfig": "^0.9.1",
-    "sql.js": "1.12.0",
     "typescript": "~6.0.3",
     "vite": "^8.3.6",
     "vitest": "^5.1.0",
