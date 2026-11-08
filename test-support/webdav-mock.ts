@@ -65,11 +65,11 @@ export function createMockDav(username: string, password: string, mount = '/dav/
         const destination = req.headers.destination && decodeURIComponent(new URL(req.headers.destination).pathname)
         if (!file || !destination) return res(file ? 400 : 404)
         if (!dirs.has(parent(destination))) return res(409)
-        const existed = files.has(destination)
-        if (existed && req.headers.overwrite === 'F') return res(412)
+        // Like Nutstore: refuse to replace an existing file even with Overwrite: T.
+        if (files.has(destination)) return res(409)
         files.delete(path)
         files.set(destination, { ...file, etag: `e${++counter}` })
-        return res(existed ? 204 : 201)
+        return res(201)
       }
       case 'DELETE':
         return files.delete(path) ? res(204) : res(404)

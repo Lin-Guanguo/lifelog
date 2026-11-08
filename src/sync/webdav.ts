@@ -72,8 +72,9 @@ export function createWebDav(config: WebDavConfig, transport: HttpTransport) {
       await request('PUT', url, [200, 201, 204], { 'Content-Type': 'application/vnd.sqlite3' }, body)
     },
 
-    async move(from: string, to: string): Promise<void> {
-      await request('MOVE', from, [201, 204], { Destination: to, Overwrite: 'T' })
+    // Succeeds when the file is already gone.
+    async remove(url: string): Promise<void> {
+      await request('DELETE', url, [200, 204, 404])
     },
   }
 }

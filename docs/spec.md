@@ -53,8 +53,10 @@ One sync step:
    rows missing locally are added; a deletion on either side wins; a remote live text that would give
    an entry a second live row (edited on both devices) goes to the trash instead.
 3. Upload only if the server lacks something (local changes, data changed by the merge, or no file
-   yet): `PUT` to `lifelog.sqlite.uploading`, then `MOVE` over the target so readers never see a
-   partial file. Otherwise just adopt the remote version (no ping-pong between devices).
+   yet) with a plain `PUT` over `lifelog.sqlite`. Otherwise just adopt the remote version (no ping-pong
+   between devices). Uploading to a temporary name and `MOVE`-ing it over the target is not portable:
+   Nutstore (坚果云) answers 409 to a MOVE onto an existing file even with `Overwrite: T`. A leftover
+   `lifelog.sqlite.uploading` from v0.2.0–0.2.2 is deleted after the next upload.
 
 Automatic sync runs on start, on resume and every minute while open, but only once the chosen
 interval (5 minutes / 1 hour / 1 day, or custom minutes/hours/days or manual only; default 1 day) has passed since the last sync or

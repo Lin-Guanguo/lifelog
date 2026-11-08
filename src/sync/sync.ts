@@ -4,6 +4,7 @@ import type { WebDav } from './webdav'
 
 // The server keeps one standard SQLite snapshot of the log.
 export const REMOTE_FILE = 'lifelog.sqlite'
+const LEGACY_TEMP_FILE = `${REMOTE_FILE}.uploading`
 
 export interface SyncState {
   // Version of the remote file as this device last wrote or merged it. A different version on the
@@ -35,9 +36,10 @@ export async function sync(dav: WebDav, records: Records, state: SyncState, dirt
 
   if (remote === null) await dav.ensureDirectory()
   beforeUpload()
-  // Upload beside the target, then move over it, so readers never see a partial file.
-  const temp = dav.fileUrl(`${REMOTE_FILE}.uploading`)
-  await dav.put(temp, await toSqliteFile(await records.all()))
-  await dav.move(temp, url)
+  // A plain PUT over the file. Uploading to a temporary name and moving it over the target is not
+  // portable: Nutstore (坚果云) rejects MOVE onto an existing file with 409 even with Overwrite: T.
+  await dav.put(url, await toSqliteFile(await records.all()))
+  // v0.2.0–0.2.2 uploaded via a temporary file that could be left behind; clean it up.
+  await dav.remove(dav.fileUrl(LEGACY_TEMP_FILE)).catch(() => {})
   return { state: { remoteVersion: (await dav.version(url)) ?? undefined, lastSyncAt: now }, merged, uploaded: true }
 }

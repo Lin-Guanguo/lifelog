@@ -68,6 +68,20 @@ describe('sync', () => {
     expect(requests).toEqual(['PROPFIND'])
   })
 
+  it('replaces the remote file in place and removes a temp file left by older versions', async () => {
+    const phone = await device()
+    const dav = createWebDav(CONFIG, transport())
+    let { state } = await sync(dav, phone, {}, true)
+    server.files.set(`${remotePath}.uploading`, { body: new Uint8Array([1]), etag: 'stale', modified: '' })
+    await phone.add('second')
+    ;({ state } = await sync(dav, phone, state, true))
+    await phone.add('third')
+    ;({ state } = await sync(dav, phone, state, true))
+    expect(await remoteLive()).toEqual(['second', 'third'])
+    expect([...server.files.keys()]).toEqual([remotePath])
+    expect(requests).not.toContain('MOVE')
+  })
+
   it('uploads local changes when the remote is unchanged', async () => {
     const phone = await device()
     const dav = createWebDav(CONFIG, transport())
