@@ -1,5 +1,18 @@
 apply plugin: 'com.android.application'
 
+// Version: -PappVersion=x.y.z (the release workflow passes it); versionCode is derived so it always grows.
+def appVersion = (findProperty('appVersion') ?: '0.2.4').toString()
+def (major, minor, patch) = appVersion.tokenize('.').collect { it as int }
+
+// The app's identity: updates install only when signed with this key. Locally it is
+// ~/.android/lifelog-release.jks with its password in lifelog-release.password beside it;
+// CI passes LIFELOG_KEYSTORE and LIFELOG_KEYSTORE_PASSWORD (from repository secrets).
+def releaseKeystore = file(System.getenv('LIFELOG_KEYSTORE') ?: "${System.getProperty('user.home')}/.android/lifelog-release.jks")
+def releasePassword = System.getenv('LIFELOG_KEYSTORE_PASSWORD') ?: {
+    def f = file(releaseKeystore.path.replaceFirst(/\.jks$/, '.password'))
+    f.exists() ? f.text.trim() : null
+}()
+
 android {
     namespace = "dev.linguanguo.lifelog"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +20,8 @@ android {
         applicationId "dev.linguanguo.lifelog"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 7
-        versionName "0.2.4"
+        versionCode major * 10000 + minor * 100 + patch
+        versionName appVersion
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,8 +29,21 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        lifelog {
+            storeFile releaseKeystore
+            storePassword releasePassword
+            keyAlias 'lifelog'
+            keyPassword releasePassword
+        }
+    }
     buildTypes {
+        // Debug builds use the same key when it is present, so they install over released APKs.
+        debug {
+            if (releaseKeystore.exists()) signingConfig signingConfigs.lifelog
+        }
         release {
+            if (releaseKeystore.exists()) signingConfig signingConfigs.lifelog
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

@@ -51,7 +51,22 @@ cd android && ./gradlew assembleDebug
 # → android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-The debug APK is signed with this machine's debug key; later builds from the same machine install as updates.
+Builds are signed with the release key `~/.android/lifelog-release.jks` (password in `lifelog-release.password`
+beside it; both kept on N100 and tencent2, never in git) when it is present, so local builds and GitHub releases
+install over each other. Without it, debug builds fall back to the SDK debug key, which cannot update a released app.
+The version comes from `-PappVersion=x.y.z` (versionCode = x·10000 + y·100 + z).
+
+## Release
+
+Releases are built by GitHub Actions, started by hand only:
+
+```bash
+gh workflow run release.yml -f version=0.2.5   # or GitHub → Actions → Release → Run workflow
+```
+
+It checks the version is newer than the latest release, runs the tests, builds the APK signed with the key from the
+repository secrets `LIFELOG_KEYSTORE_BASE64` and `LIFELOG_KEYSTORE_PASSWORD`, tags `v0.2.5` and publishes the
+Release with `lifelog-0.2.5.apk`.
 
 ## Read the data on a computer
 

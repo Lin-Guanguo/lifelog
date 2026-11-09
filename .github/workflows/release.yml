@@ -1,0 +1,53 @@
+# Builds a signed APK and publishes it as a GitHub Release. Started by hand only:
+#   gh workflow run release.yml -f version=0.2.5   (or Actions → Release → Run workflow)
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release, e.g. 0.2.5 (must be newer than the latest release)
+        required: true
+
+permissions:
+  contents: write
+
+concurrency: release
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ inputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the version
+        run: |
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::version must look like 1.2.3"; exit 1; }
+          latest=$(gh release view --json tagName -q .tagName 2>/dev/null | sed 's/^v//' || true)
+          if [ -n "$latest" ] && [ "$(printf '%s\n%s\n' "$latest" "$VERSION" | sort -V | tail -1)" != "$VERSION" -o "$latest" = "$VERSION" ]; then
+            echo "::error::$VERSION is not newer than the latest release $latest"; exit 1
+          fi
+
+      - uses: jdx/mise-action@v2
+      - run: mise run android-setup
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - run: pnpm android
+
+      - name: Build the signed APK
+        env:
+          LIFELOG_KEYSTORE: ${{ runner.temp }}/lifelog-release.jks
+          LIFELOG_KEYSTORE_PASSWORD: ${{ secrets.LIFELOG_KEYSTORE_PASSWORD }}
+          KEYSTORE_BASE64: ${{ secrets.LIFELOG_KEYSTORE_BASE64 }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > "$LIFELOG_KEYSTORE"
+          cd android
+          ./gradlew --no-daemon :app:testDebugUnitTest assembleRelease -PappVersion="$VERSION"
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/lifelog-$VERSION.apk"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$RUNNER_TEMP/lifelog-$VERSION.apk" | grep SHA-256
+
+      - name: Publish the release
+        run: gh release create "v$VERSION" "$RUNNER_TEMP/lifelog-$VERSION.apk" --target "$GITHUB_SHA" --title "LifeLog $VERSION" --generate-notes

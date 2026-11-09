@@ -52,4 +52,6 @@ Rules that are easy to break:
   Sync merging relies on this.
 - **sql.js stays at 1.12.0** (`pnpm-workspace.yaml`): jeep-sqlite bundles that version's glue.
 - UI changes: keep `e2e/gallery.spec.ts` covering every screen and its flow notes current.
+- **Signing key** (`~/.android/lifelog-release.jks` + `.password`): the app's identity; never commit, print or move it.
+  Releases: `.github/workflows/release.yml`, run by hand (README → Release).
 - Icons: edit `resources/icon-foreground.svg`, then `node scripts/gen-icons.mjs`.
