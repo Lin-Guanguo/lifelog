@@ -1,5 +1,6 @@
 import { devices, expect, test, type Browser, type Page } from '@playwright/test'
 import { readFileSync, writeFileSync } from 'node:fs'
+import pkg from '../package.json' with { type: 'json' }
 
 // Renders every screen of the real app (production build) in light and dark mode and writes a
 // self-contained review page: docs/design/ui.html. Run with `pnpm gallery`.
@@ -117,7 +118,7 @@ async function capture(browser: Browser, theme: Theme) {
   await shot('Results', '')
   await back().click()
 
-  flow('Settings', 'Tap “LifeLog ›” in the header. Sections in order: language, trash, sync, then About the author.')
+  flow('Settings', 'Tap “LifeLog ›” in the header. Sections in order: language, trash, sync, about (version, author).')
   await page.getByRole('button', { name: 'LifeLog，打开设置' }).click()
   await shot('Settings', 'Language and trash retention (presets or custom).')
   await page.getByRole('group', { name: '自动清除时间' }).getByRole('button', { name: '自定义' }).click()
@@ -161,6 +162,26 @@ async function capture(browser: Browser, theme: Theme) {
   await shot('Permanent delete', '')
   await page.getByRole('alertdialog').getByRole('button', { name: '取消' }).click()
   await back().click()
+  await back().click()
+
+  flow('Updates', 'Settings → About → “检查更新”. Nothing is checked automatically. The dialog shows the current version '
+    + 'and asks GitHub for the latest release. When it is newer: the release notes (from CHANGELOG.md) and three choices — '
+    + '“下载更新” opens the APK in the browser, whose download notification leads to Android’s install prompt; '
+    + '“查看更新” opens the GitHub release page; “以后再说” closes.')
+  let latest = pkg.version
+  await page.route('https://api.github.com/**', (route) => route.fulfill({ json: {
+    tag_name: `v${latest}`, body: '- 检查更新：设置 → 关于\n- 详情可原地展开为全屏', html_url: 'https://github.com/x', draft: false,
+    prerelease: false, assets: [{ name: `lifelog-${latest}.apk`, browser_download_url: 'https://github.com/x.apk' }] } }))
+  await page.getByRole('button', { name: 'LifeLog，打开设置' }).click()
+  await page.getByRole('button', { name: '检查更新' }).click()
+  await expect(page.getByRole('alertdialog').getByRole('status')).toHaveText('已是最新版本。')
+  await shot('Up to date', '')
+  await page.getByRole('alertdialog').getByRole('button', { name: '关闭' }).click()
+  latest = '9.9.9'
+  await page.getByRole('button', { name: '检查更新' }).click()
+  await expect(page.getByRole('link', { name: '下载更新' })).toBeVisible()
+  await shot('New version found', '')
+  await page.getByRole('button', { name: '以后再说' }).click()
   await back().click()
 
   flow('English', 'Every visible string comes from the i18n catalogs; the language follows the system or Settings.')

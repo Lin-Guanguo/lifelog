@@ -1,13 +1,10 @@
-# Builds a signed APK and publishes it as a GitHub Release. Started by hand only:
-#   gh workflow run release.yml -f version=0.2.5   (or Actions → Release → Run workflow)
+# Builds a signed APK and publishes it as a GitHub Release. Started by hand only, from main:
+#   gh workflow run release.yml   (or Actions → Release → Run workflow)
+# The version is package.json's; its notes are its section in CHANGELOG.md.
 name: Release
 
 on:
   workflow_dispatch:
-    inputs:
-      version:
-        description: Version to release, e.g. 0.2.5 (must be newer than the latest release)
-        required: true
 
 permissions:
   contents: write
@@ -18,23 +15,29 @@ jobs:
   release:
     runs-on: ubuntu-latest
     env:
-      VERSION: ${{ inputs.version }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v5
 
-      - name: Check the version
+      - name: Check the version and notes
         run: |
+          [ "$GITHUB_REF" = refs/heads/main ] || { echo "::error::release from main only"; exit 1; }
+          VERSION=$(node -p "require('./package.json').version")
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::version must look like 1.2.3"; exit 1; }
           latest=$(gh release view --json tagName -q .tagName 2>/dev/null | sed 's/^v//' || true)
           if [ -n "$latest" ] && [ "$(printf '%s\n%s\n' "$latest" "$VERSION" | sort -V | tail -1)" != "$VERSION" -o "$latest" = "$VERSION" ]; then
-            echo "::error::$VERSION is not newer than the latest release $latest"; exit 1
+            echo "::error::$VERSION is not newer than the latest release $latest; bump package.json"; exit 1
           fi
+          awk -v v="$VERSION" '/^## /{p=($2==v); next} p' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          grep -q '[^[:space:]]' "$RUNNER_TEMP/notes.md" || { echo "::error::CHANGELOG.md has no section for $VERSION"; exit 1; }
 
       - uses: jdx/mise-action@v3
       - run: mise run android-setup
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm e2e
       - run: pnpm android
 
       - name: Build the signed APK
@@ -45,9 +48,9 @@ jobs:
         run: |
           echo "$KEYSTORE_BASE64" | base64 -d > "$LIFELOG_KEYSTORE"
           cd android  # mise x: its JAVA_HOME/ANDROID_HOME, not the runner's preinstalled JDK
-          mise x -- ./gradlew --no-daemon :app:testDebugUnitTest assembleRelease -PappVersion="$VERSION"
+          mise x -- ./gradlew --no-daemon :app:testDebugUnitTest assembleRelease
           cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/lifelog-$VERSION.apk"
           mise x -- apksigner verify --print-certs "$RUNNER_TEMP/lifelog-$VERSION.apk" | grep SHA-256
 
       - name: Publish the release
-        run: gh release create "v$VERSION" "$RUNNER_TEMP/lifelog-$VERSION.apk" --target "$GITHUB_SHA" --title "LifeLog $VERSION" --generate-notes
+        run: gh release create "v$VERSION" "$RUNNER_TEMP/lifelog-$VERSION.apk" --target "$GITHUB_SHA" --title "LifeLog $VERSION" --notes-file "$RUNNER_TEMP/notes.md"

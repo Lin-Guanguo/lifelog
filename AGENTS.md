@@ -53,5 +53,6 @@ Rules that are easy to break:
 - **sql.js stays at 1.12.0** (`pnpm-workspace.yaml`): jeep-sqlite bundles that version's glue.
 - UI changes: keep `e2e/gallery.spec.ts` covering every screen and its flow notes current.
 - **Signing key** (`~/.android/lifelog-release.jks` + `.password`): the app's identity; never commit, print or move it.
-  Releases: `.github/workflows/release.yml`, run by hand (README → Release).
+  Releases: `.github/workflows/release.yml`, run by hand only when the owner asks (README → Release). The version lives
+  only in `package.json`; each release needs its `CHANGELOG.md` section.
 - Icons: edit `resources/icon-foreground.svg`, then `node scripts/gen-icons.mjs`.

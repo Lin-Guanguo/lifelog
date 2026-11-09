@@ -78,8 +78,19 @@ WebView's `fetch` is subject to CORS and Capacitor's HTTP plugin cannot send Web
   - "LifeLog ›" opens Settings; the search icon opens Search.
 - **Edit**: explicit Save; leaving with changes (back arrow or Android back) asks Save / Discard / Keep editing. Unchanged text saves nothing.
 - **Search**: highlighted matches grouped by day; tap opens the sheet.
-- **Settings**: language (system / 中文 / English); trash auto-clear period (presets + custom dialog) and trash entry; WebDAV sync (connection, status, sync now, interval). The main header shows a sync status chip.
+- **Settings**: language (system / 中文 / English); trash auto-clear period (presets + custom dialog) and trash entry; WebDAV sync (connection, status, sync now, interval); about (check for updates, author pop-up). The main header shows a sync status chip.
 - **Trash**: search box; cards grouped by entry (current text shown for reference); rows show original/saved time and days left; select rows or whole entries; restore or delete forever.
+
+## Updates and releases
+
+- Version: `package.json` is the single source (web bundle, Android versionName; versionCode = x·10000 + y·100 + z).
+- Releases are GitHub Releases `vX.Y.Z` with one asset `lifelog-X.Y.Z.apk`, built and signed by the manually started
+  release workflow; notes come from that version's section in `CHANGELOG.md`.
+- Check: only when the user taps Settings → About → "检查更新" (nothing automatic). A dialog shows the current version
+  and asks GitHub's `releases/latest` API (no login): up to date, failed, or a newer version with its notes and
+  "下载更新" (the APK URL in the system browser; Android shows its install prompt from the download), "查看更新" (the
+  release page in the browser), "以后再说" (close). No in-app download, no install permission. Updates install over the
+  old app only with the same signing key.
 
 ## Internationalization
 
@@ -89,5 +100,4 @@ Dates and durations use `Intl.DateTimeFormat` / `Intl.NumberFormat` with the act
 ## Not yet
 
 - iOS (needs an iOS counterpart of the native WebDAV HTTP plugin).
-- Swipe-down to close the sheet (tap outside or Android back instead).
 - Context lines around search matches.

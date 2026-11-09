@@ -54,19 +54,21 @@ cd android && ./gradlew assembleDebug
 Builds are signed with the release key `~/.android/lifelog-release.jks` (password in `lifelog-release.password`
 beside it; both kept on N100 and tencent2, never in git) when it is present, so local builds and GitHub releases
 install over each other. Without it, debug builds fall back to the SDK debug key, which cannot update a released app.
-The version comes from `-PappVersion=x.y.z` (versionCode = x·10000 + y·100 + z).
+The version is `package.json`'s (versionCode = x·10000 + y·100 + z).
 
 ## Release
 
-Releases are built by GitHub Actions, started by hand only:
+1. Bump `version` in `package.json` and add its section to `CHANGELOG.md` (the release notes, shown in the app).
+2. Commit and push to main, then start the workflow by hand:
 
 ```bash
-gh workflow run release.yml -f version=0.2.5   # or GitHub → Actions → Release → Run workflow
+gh workflow run release.yml   # or GitHub → Actions → Release → Run workflow
 ```
 
-It checks the version is newer than the latest release, runs the tests, builds the APK signed with the key from the
-repository secrets `LIFELOG_KEYSTORE_BASE64` and `LIFELOG_KEYSTORE_PASSWORD`, tags `v0.2.5` and publishes the
-Release with `lifelog-0.2.5.apk`.
+It refuses a version that is not newer than the latest release or has no changelog section, runs the unit, browser
+and Android tests, builds the APK signed with the key from the repository secrets `LIFELOG_KEYSTORE_BASE64` and
+`LIFELOG_KEYSTORE_PASSWORD`, tags `vX.Y.Z` and publishes the Release with `lifelog-X.Y.Z.apk`. Installed apps find it
+through their update check.
 
 ## Read the data on a computer
 

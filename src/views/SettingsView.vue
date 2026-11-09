@@ -9,6 +9,8 @@ import { RETENTION_PRESETS, setLocalePreference, setRetentionHours } from '../da
 import { formatHours } from '../format'
 import { localeName, localePreference, LOCALES, t, type LocalePreference } from '../i18n'
 import { closeScreen, db, openScreen, retentionHours } from '../store'
+import UpdateDialog from '../components/UpdateDialog.vue'
+import { checkForUpdate, update } from '../update/controller'
 
 const trashCount = ref(0)
 const isCustom = computed(() => !RETENTION_PRESETS.includes(retentionHours.value))
@@ -72,7 +74,12 @@ onMounted(async () => {
       <h2 class="section-title">{{ t('sync.title') }}</h2>
       <SyncSettings />
 
-      <button class="row-link" type="button" style="margin: 24px 0" @click="aboutOpen = true">
+      <h2 class="section-title">{{ t('update.section') }}</h2>
+      <button class="row-link" type="button" @click="checkForUpdate">
+        <span>{{ t('update.check') }}</span>
+        <AppIcon name="chevron" :size="16" />
+      </button>
+      <button class="row-link" type="button" style="margin: 12px 0 24px" @click="aboutOpen = true">
         <span>{{ t('about.title') }}</span>
         <AppIcon name="chevron" :size="16" />
       </button>
@@ -82,5 +89,6 @@ onMounted(async () => {
       :off-label="t('settings.neverClear')" :fallback-minutes="7 * 24 * 60"
       @cancel="customOpen = false" @save="(minutes) => { customOpen = false; chooseRetention(minutes / 60) }" />
     <AboutDialog v-if="aboutOpen" @close="aboutOpen = false" />
+    <UpdateDialog v-if="update.open" />
   </div>
 </template>
