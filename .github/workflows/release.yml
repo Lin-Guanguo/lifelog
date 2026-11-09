@@ -21,7 +21,7 @@ jobs:
       VERSION: ${{ inputs.version }}
       GH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Check the version
         run: |
@@ -31,7 +31,7 @@ jobs:
             echo "::error::$VERSION is not newer than the latest release $latest"; exit 1
           fi
 
-      - uses: jdx/mise-action@v2
+      - uses: jdx/mise-action@v3
       - run: mise run android-setup
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
@@ -44,10 +44,10 @@ jobs:
           KEYSTORE_BASE64: ${{ secrets.LIFELOG_KEYSTORE_BASE64 }}
         run: |
           echo "$KEYSTORE_BASE64" | base64 -d > "$LIFELOG_KEYSTORE"
-          cd android
-          ./gradlew --no-daemon :app:testDebugUnitTest assembleRelease -PappVersion="$VERSION"
+          cd android  # mise x: its JAVA_HOME/ANDROID_HOME, not the runner's preinstalled JDK
+          mise x -- ./gradlew --no-daemon :app:testDebugUnitTest assembleRelease -PappVersion="$VERSION"
           cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/lifelog-$VERSION.apk"
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$RUNNER_TEMP/lifelog-$VERSION.apk" | grep SHA-256
+          mise x -- apksigner verify --print-certs "$RUNNER_TEMP/lifelog-$VERSION.apk" | grep SHA-256
 
       - name: Publish the release
         run: gh release create "v$VERSION" "$RUNNER_TEMP/lifelog-$VERSION.apk" --target "$GITHUB_SHA" --title "LifeLog $VERSION" --generate-notes
