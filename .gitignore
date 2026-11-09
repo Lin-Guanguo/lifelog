@@ -12,6 +12,7 @@ release/
 # Tests
 test-results/
 playwright-report/
+docs/design/ui.html
 
 # Native platforms: android/.gitignore and ios/.gitignore (created by `cap add`)
 # cover their build output. Signing material never belongs in the repo.

@@ -37,13 +37,17 @@ test('v1 acceptance flow', async ({ page }) => {
   const clamp = await entry(page, '很长的一条记录').locator('.text').evaluate((el) => getComputedStyle(el).webkitLineClamp)
   expect(clamp).toBe('3')
 
-  // Tap opens the sheet with the full text; full screen view and back
+  // Tap opens the sheet with the full text; it expands to full screen in place and collapses back
   await entry(page, '很长的一条记录').click()
   const sheet = page.getByRole('dialog', { name: '记录详情' })
   await expect(sheet).toContainText(long)
   await sheet.getByRole('button', { name: '全屏查看' }).click()
-  await expect(page.locator('.screen').last().locator('.longtext')).toHaveText(long)
-  await back(page).click()
+  await expect(sheet).toHaveClass(/expanded/)
+  await expect.poll(() => sheet.evaluate((el) => el.getBoundingClientRect().top)).toBe(0)
+  await expect(sheet.getByRole('button', { name: '编辑' })).toBeVisible()
+  await sheet.getByRole('button', { name: '退出全屏' }).click()
+  await expect(sheet).not.toHaveClass(/expanded/)
+  await page.locator('.scrim').click({ position: { x: 10, y: 10 } })
   await expect(sheet).toBeHidden()
 
   // Edit from the sheet: leaving with changes prompts; saving keeps the time

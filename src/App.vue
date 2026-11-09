@@ -4,7 +4,6 @@ import { onMounted, onUnmounted } from 'vue'
 import { handleBack } from './back'
 import EditView from './views/EditView.vue'
 import MainView from './views/MainView.vue'
-import RecordView from './views/RecordView.vue'
 import SearchView from './views/SearchView.vue'
 import SettingsView from './views/SettingsView.vue'
 import TrashView from './views/TrashView.vue'
@@ -30,11 +29,12 @@ onUnmounted(() => removers.forEach((r) => r()))
 
 <template>
   <MainView />
-  <template v-for="(screen, i) in screens" :key="i">
-    <SearchView v-if="screen.name === 'search'" />
-    <SettingsView v-else-if="screen.name === 'settings'" />
-    <TrashView v-else-if="screen.name === 'trash'" />
-    <RecordView v-else-if="screen.name === 'view'" :entry-id="screen.entryId" />
-    <EditView v-else-if="screen.name === 'edit'" :entry-id="screen.entryId" />
-  </template>
+  <TransitionGroup name="screen">
+    <template v-for="(screen, i) in screens" :key="i">
+      <SearchView v-if="screen.name === 'search'" />
+      <SettingsView v-else-if="screen.name === 'settings'" />
+      <TrashView v-else-if="screen.name === 'trash'" />
+      <EditView v-else-if="screen.name === 'edit'" :entry-id="screen.entryId" />
+    </template>
+  </TransitionGroup>
 </template>

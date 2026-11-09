@@ -4,6 +4,7 @@
   --accent: #2F5FD0; --accent-soft: #EAF0FC; --on-accent: #FFFFFF;
   --warn: #B45309; --warn-soft: #FFF4E5; --ok: #1E6B3A;
   --danger: #B42318; --mark: #FFE7A8; --scrim: rgba(20, 22, 21, .42);
+  --ease: cubic-bezier(.2, .8, .2, 1);
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -74,6 +75,10 @@ input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--accent); m
   position: fixed; left: 0; right: 0; bottom: 0; max-height: 72vh; background: var(--surface); border-radius: 22px 22px 0 0;
   padding: 10px 20px calc(20px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom))); display: flex; flex-direction: column; gap: 10px;
 }
+.sheet { transition: transform .28s var(--ease), max-height .32s var(--ease), min-height .32s var(--ease), border-radius .32s var(--ease),
+  padding-top .32s var(--ease); }
+.sheet.expanded { min-height: 100%; max-height: 100%; border-radius: 0; padding-top: calc(10px + var(--safe-area-inset-top, env(safe-area-inset-top))); }
+.sheet.dragging { transition: none; }
 .grabber { align-self: center; width: 40px; height: 5px; border-radius: 3px; background: var(--field); }
 .meta { font-size: 13px; color: var(--muted); }
 .longtext { margin: 0; font-size: 17px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -100,3 +105,14 @@ mark { background: var(--mark); color: inherit; border-radius: 3px; padding: 0 2
 .seg button[aria-pressed=true] { background: var(--surface); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.15); }
 .row-link { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; padding: 0 14px; border: 0; background: var(--surface); border-radius: 14px; font-size: 16px; text-align: left; }
 .row-link span:first-of-type { flex-grow: 1; font-weight: 500; }
+
+/* Motion */
+.fade-enter-active, .fade-leave-active { transition: opacity .25s var(--ease); }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+.fade-leave-active, .slide-up-leave-active, .screen-leave-active { pointer-events: none; }
+.slide-up-enter-from, .slide-up-leave-to { transform: translateY(100%); }
+.screen-enter-active, .screen-leave-active { transition: transform .26s var(--ease), opacity .26s var(--ease); }
+.screen-enter-from, .screen-leave-to { transform: translateX(28%); opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 1ms !important; animation-duration: 1ms !important; }
+}

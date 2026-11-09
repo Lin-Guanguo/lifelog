@@ -1,7 +1,7 @@
 # LifeLog
 
-Local-first Android app for logging short timestamped lines. See [docs/spec.md](docs/spec.md) and the
-[mockups](docs/design/mockups.html).
+Local-first Android app for logging short timestamped lines. See [docs/spec.md](docs/spec.md); `pnpm gallery`
+renders every screen into `docs/design/ui.html` for design review.
 
 Stack: Vue 3 + TypeScript + Vite, Capacitor 8, SQLite via `@capacitor-community/sqlite` (jeep-sqlite/sql.js on the web).
 
@@ -15,9 +15,9 @@ src/
   data/                records.ts (all SQL, platform-free), sqlite.ts (Capacitor adapter), preferences.ts
   i18n/                message catalogs; zh-CN is the source, others are type-checked against it
   store.ts, back.ts    shared state, Android back-button stack
-e2e/                   Playwright acceptance flow
+e2e/                   Playwright acceptance flows and the UI gallery
 android/               Capacitor Android project (committed; build output ignored)
-docs/                  spec and mockups (including the app icon)
+docs/                  spec; docs/design/ui.html is generated (git-ignored)
 resources/             icon source SVG
 scripts/               build helpers (sql.js wasm copy, icon generation)
 ```
@@ -38,6 +38,7 @@ pnpm install
 pnpm dev                 # browser at http://localhost:5173 (SQLite persisted in IndexedDB)
 pnpm test                # data-layer and i18n unit tests
 pnpm e2e                 # browser acceptance flow (Playwright)
+pnpm gallery             # screenshots of every screen, light + dark, with flow notes → docs/design/ui.html
 ```
 
 `pnpm e2e` uses Playwright's pinned Chromium; set `PW_CHROMIUM_PATH` to use another Chromium binary.

@@ -27,14 +27,13 @@ export default {
 
   'sheet.label': 'Entry details',
   'sheet.fullscreen': 'Full screen',
+  'sheet.collapse': 'Exit full screen',
   'sheet.edit': 'Edit',
   'sheet.delete': 'Delete',
 
   'delete.title': 'Delete this entry?',
   'delete.message': 'It moves to the trash and can be restored within {duration}.',
   'delete.messageNoCleanup': 'It moves to the trash and can be restored at any time.',
-
-  'view.edit': 'Edit',
 
   'edit.title': 'Edit · {date} {time}',
   'edit.label': 'Content',

@@ -21,7 +21,6 @@ export type Screen =
   | { name: 'search' }
   | { name: 'settings' }
   | { name: 'trash' }
-  | { name: 'view'; entryId: string }
   | { name: 'edit'; entryId: string }
 
 // Screens stacked over the always-mounted main log.

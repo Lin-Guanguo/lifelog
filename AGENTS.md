@@ -34,6 +34,7 @@ Tools are pinned in `mise.toml`; run commands through it (`mise x -- pnpm …`) 
 pnpm install
 pnpm test               # unit tests (vitest): data layer, migrations, sync, i18n
 pnpm e2e                # browser flows on the production build (Playwright; PW_CHROMIUM_PATH for a local Chromium)
+pnpm gallery            # every screen, light + dark, with flow notes → docs/design/ui.html (review UI changes here)
 pnpm build              # type-check + production build
 pnpm android && (cd android && ./gradlew :app:testDebugUnitTest assembleDebug)   # APK
 ```
@@ -50,4 +51,5 @@ Rules that are easy to break:
 - **Content is immutable**: edits insert a new row and soft-delete the old one; only `deleted_at` changes.
   Sync merging relies on this.
 - **sql.js stays at 1.12.0** (`pnpm-workspace.yaml`): jeep-sqlite bundles that version's glue.
+- UI changes: keep `e2e/gallery.spec.ts` covering every screen and its flow notes current.
 - Icons: edit `resources/icon-foreground.svg`, then `node scripts/gen-icons.mjs`.

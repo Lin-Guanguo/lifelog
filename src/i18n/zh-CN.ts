@@ -26,14 +26,13 @@ export default {
 
   'sheet.label': '记录详情',
   'sheet.fullscreen': '全屏查看',
+  'sheet.collapse': '退出全屏',
   'sheet.edit': '编辑',
   'sheet.delete': '删除',
 
   'delete.title': '删除这条记录？',
   'delete.message': '这条记录会移到回收站，{duration}内可以恢复。',
   'delete.messageNoCleanup': '这条记录会移到回收站，可以随时恢复。',
-
-  'view.edit': '编辑',
 
   'edit.title': '编辑 · {date} {time}',
   'edit.label': '内容',

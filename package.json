@@ -10,6 +10,7 @@
     "android": "pnpm build && cap sync android",
     "test": "vitest run src",
     "e2e": "playwright test",
+    "gallery": "playwright test -c playwright.gallery.config.ts",
     "lifelog": "node scripts/lifelog.mjs"
   },
   "dependencies": {

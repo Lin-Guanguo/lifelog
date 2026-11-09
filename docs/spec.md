@@ -71,10 +71,11 @@ WebView's `fetch` is subject to CORS and Capacitor's HTTP plugin cannot send Web
 ## Screens
 
 - **Main**: chat-style stream, oldest at top, newest at the bottom above the composer; grouped by day; long text clamped to 3 lines.
-  - Tap: half-screen sheet with the full text and three icons (full screen, edit, delete with confirmation).
+  - Tap: half-screen sheet with the full text and three icons stacked bottom-right (full screen, edit, delete with
+    confirmation). Full screen expands the same sheet in place, keeping the icons; the first icon or back collapses it.
+    Dragging the handle up expands, down collapses or closes.
   - Long-press: multi-select; tap more rows; delete moves them to the trash.
   - "LifeLog ›" opens Settings; the search icon opens Search.
-- **Full screen view**: full text, edit and delete.
 - **Edit**: explicit Save; leaving with changes (back arrow or Android back) asks Save / Discard / Keep editing. Unchanged text saves nothing.
 - **Search**: highlighted matches grouped by day; tap opens the sheet.
 - **Settings**: language (system / 中文 / English); trash auto-clear period (presets + custom dialog) and trash entry; WebDAV sync (connection, status, sync now, interval). The main header shows a sync status chip.

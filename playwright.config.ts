@@ -2,6 +2,7 @@ import { defineConfig, devices } from '@playwright/test'
 
 export default defineConfig({
   testDir: 'e2e',
+  testIgnore: 'gallery.spec.ts', // pnpm gallery
   fullyParallel: false,
   retries: 0,
   reporter: 'list',
