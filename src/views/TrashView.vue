@@ -10,7 +10,7 @@ import ConfirmDialog from '../components/ConfirmDialog.vue'
 import HighlightText from '../components/HighlightText.vue'
 
 interface Group {
-  entryId: string
+  entryId: number
   loggedAt: number
   current?: LogRecord
   rows: LogRecord[]
@@ -19,13 +19,13 @@ interface Group {
 const query = ref('')
 const trashed = ref<LogRecord[]>([])
 const live = ref<LogRecord[]>([])
-const selected = ref(new Set<string>())
+const selected = ref(new Set<number>())
 const dialog = ref<'overwrite' | 'purge'>()
 useBackHandler(closeScreen)
 
 const groups = computed<Group[]>(() => {
   const current = new Map(live.value.map((r) => [r.entry_id, r]))
-  const byEntry = new Map<string, Group>()
+  const byEntry = new Map<number, Group>()
   for (const row of trashed.value) {
     let group = byEntry.get(row.entry_id)
     if (!group) {
@@ -56,7 +56,7 @@ watch(query, () => {
   timer = window.setTimeout(load, 150)
 })
 
-function toggle(id: string) {
+function toggle(id: number) {
   const next = new Set(selected.value)
   if (next.has(id)) next.delete(id)
   else next.add(id)

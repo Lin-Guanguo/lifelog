@@ -21,8 +21,10 @@ pnpm --silent lifelog help
 - `pull` needs `.env` (keys in `.env.example`). If it is missing, ask the owner; never invent credentials.
 - Pull first when freshness matters; `info` shows when the local copy was fetched.
 - Use `--silent` (not `-s`) or `node scripts/lifelog.mjs` so `--json` output parses.
-- Data model: one row per saved text in `records`. Rows with the same `entry_id` are one entry and its edits;
-  `deleted_at IS NULL` marks the entry's current text, other rows are in the trash (deleted or pre-edit).
+- Data model: one row per saved text in `records`, with integer ids (time-ordered; `entry_id` = id of the
+  entry's first row). Rows with the same `entry_id` are one entry and its edits;
+  `deleted_at IS NULL` marks the entry's current text, other rows are in the trash (deleted or pre-edit);
+  `purged_at` set marks a permanently deleted row whose text is erased (the CLI hides those).
   `logged_at` is when the entry was written (epoch ms), unchanged by edits. Analyze live rows unless asked.
 - The log is private: don't commit `.env` or `.data/`, and don't send its contents to outside services.
 
@@ -48,8 +50,8 @@ Rules that are easy to break:
   `PRAGMA user_version`.
 - **Text**: every user-visible string goes through `t()` with keys in `src/i18n/zh-CN.ts` (source) and every
   other catalog; the i18n test checks keys and placeholders match.
-- **Content is immutable**: edits insert a new row and soft-delete the old one; only `deleted_at` changes.
-  Sync merging relies on this.
+- **Rows are append-only and only move forward** (live → trashed → purged): edits and restores insert new rows;
+  only `deleted_at`, `purged_at` (and purging's `content = ''`) ever change. Sync merging relies on this.
 - **sql.js stays at 1.12.0** (`pnpm-workspace.yaml`): jeep-sqlite bundles that version's glue.
 - UI changes: keep `e2e/gallery.spec.ts` covering every screen and its flow notes current.
 - **Signing key** (`~/.android/lifelog-release.jks` + `.password`): the app's identity; never commit, print or move it.

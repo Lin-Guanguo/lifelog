@@ -14,10 +14,9 @@ beforeEach(async () => {
   const SQL = await initSqlJs()
   sqlDb = new SQL.Database()
   clock = Date.UTC(2026, 10, 8, 10, 0)
-  let n = 0
   const executor = sqlJsExecutor(sqlDb)
   await migrate(executor)
-  records = createRecords(executor, () => clock, () => `id-${++n}`)
+  records = createRecords(executor, () => clock, () => 0)
 })
 
 describe('records', () => {
@@ -61,14 +60,19 @@ describe('records', () => {
     expect(await records.countTrash()).toBe(1)
   })
 
-  it('restoring a deleted entry brings it back', async () => {
+  it('restoring appends a new live row and purges the trash row it came from', async () => {
     await records.add('a')
     const [a] = await records.listLive()
     await records.trashEntries([a.entry_id])
+    tick()
     const { trashed } = await records.listTrash()
     await records.restore(trashed)
-    expect((await records.listLive()).map((r) => r.content)).toEqual(['a'])
+    const [restored] = await records.listLive()
+    expect(restored).toMatchObject({ content: 'a', entry_id: a.entry_id, logged_at: a.logged_at, written_at: clock, purged_at: null })
+    expect(restored.id).not.toBe(a.id)
     expect(await records.countTrash()).toBe(0)
+    expect((await records.all()).find((r) => r.id === a.id)).toMatchObject({ content: '', purged_at: clock })
+    await expect(records.restore([restored])).rejects.toThrow('not in the trash')
   })
 
   it('restoring pre-edit text overwrites the current text, which goes to the trash', async () => {
@@ -99,6 +103,9 @@ describe('records', () => {
     await records.trashEntries([a.entry_id, b.entry_id])
     await records.purge([a.id])
     expect((await records.listTrash()).trashed.map((r) => r.content)).toEqual(['b'])
+    // the row stays as a tombstone without its text
+    expect((await records.all()).find((r) => r.id === a.id)).toMatchObject({ content: '', purged_at: clock })
+    expect(await records.searchLive('a')).toEqual([])
     // live rows are never purged
     await records.add('c')
     const [c] = await records.listLive()
@@ -106,7 +113,7 @@ describe('records', () => {
     expect(await records.listLive()).toHaveLength(1)
   })
 
-  it('purgeExpired removes rows deleted longer ago than the retention', async () => {
+  it('purgeExpired purges rows deleted longer ago than the retention', async () => {
     await records.add('old')
     await records.add('new')
     const [oldRow, newRow] = await records.listLive()
@@ -119,6 +126,7 @@ describe('records', () => {
     expect(await records.countTrash()).toBe(2)
     await records.purgeExpired(7 * 24)
     expect((await records.listTrash()).trashed.map((r) => r.content)).toEqual(['new'])
+    expect((await records.all()).map((r) => [r.content, r.purged_at])).toEqual([['', clock], ['new', null]])
   })
 
   it('searches by substring and treats % and _ literally', async () => {

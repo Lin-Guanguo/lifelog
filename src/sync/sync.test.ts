@@ -22,11 +22,14 @@ function transport(): HttpTransport {
   }
 }
 
+// One shared, always-advancing clock, so "later" is well defined across devices.
+let clock = Date.UTC(2026, 10, 9) // ids take their time part from the clock (ids.ts)
+
 async function device(): Promise<Records> {
   const SQL = await loadSqlJs()
   const db = sqlJsExecutor(new SQL.Database())
   await migrate(db)
-  return createRecords(db)
+  return createRecords(db, () => ++clock)
 }
 
 async function remoteLive(): Promise<string[]> {
@@ -131,7 +134,7 @@ describe('sync', () => {
     expect(settle).toMatchObject({ merged: false, uploaded: false })
     stateB = settle.state
 
-    // Both sides agree; B kept its own edit live and A's competing edit sits in the trash.
+    // Both sides agree; B's later edit is live and A's competing edit sits in the trash.
     expect(await contents(a)).toEqual(await contents(b))
     expect(await contents(b)).toEqual(['new on A', 'shared (B)'])
     expect((await b.listTrash()).trashed.map((r) => r.content).sort()).toEqual(['shared', 'shared (A)', 'to delete'])

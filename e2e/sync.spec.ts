@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import initSqlJs from 'sql.js'
+import { SCHEMA_VERSION } from '../src/data/schema'
 
 // Runs against test-support/webdav-server.ts (started by playwright.config.ts).
 const DAV = 'http://127.0.0.1:5300/dav/'
@@ -46,7 +47,7 @@ test('WebDAV sync: upload, interval auto-sync, automatic merge on a fresh instal
   await page.getByRole('button', { name: '保存并测试连接' }).click()
   await expect(page.getByRole('status')).toContainText('上次同步')
   await expect(page.getByText('远端文件：lifelog/lifelog.sqlite')).toBeVisible()
-  expect(await remote()).toEqual({ version: 1, live: ['旧手机 第一条'] })
+  expect(await remote()).toEqual({ version: SCHEMA_VERSION, live: ['旧手机 第一条'] })
 
   // Default interval is one day; switch to 5 minutes
   const interval = page.getByRole('group', { name: '自动同步间隔' })

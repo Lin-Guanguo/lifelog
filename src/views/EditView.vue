@@ -7,7 +7,7 @@ import { closeScreen, db, liveRecords, reloadLive } from '../store'
 import AppIcon from '../components/AppIcon.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 
-const props = defineProps<{ entryId: string }>()
+const props = defineProps<{ entryId: number }>()
 // Snapshot: the edit applies to the text that was current when editing started.
 const original = liveRecords.value.find((r) => r.entry_id === props.entryId)
 const text = ref(original?.content ?? '')

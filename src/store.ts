@@ -21,7 +21,7 @@ export type Screen =
   | { name: 'search' }
   | { name: 'settings' }
   | { name: 'trash' }
-  | { name: 'edit'; entryId: string }
+  | { name: 'edit'; entryId: number }
 
 // Screens stacked over the always-mounted main log.
 export const screens = ref<Screen[]>([])

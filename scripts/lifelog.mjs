@@ -24,11 +24,13 @@ options
   --to <date>            list/search: up to the end of this local date (or exactly this time if one is given)
   --limit <n>            list/search: at most n entries (the latest ones)
   --trash                list/search: trashed rows only
-  --all                  list/search: live and trashed rows
+  --all                  list/search: live and trashed rows (never purged ones: their text is erased)
   --json                 machine-readable output
 
-table: records(id, entry_id, logged_at, content, written_at, deleted_at); times are epoch ms.
-An entry is all rows sharing entry_id; deleted_at IS NULL marks its current text.`
+table: records(id, entry_id, logged_at, content, written_at, deleted_at, purged_at); times are epoch ms;
+ids are integers (schema v2; text UUIDs in older files).
+An entry is all rows sharing entry_id; deleted_at IS NULL marks its current text.
+purged_at set = permanently deleted: content is '' and the row is only kept for sync.`
 
 const { values: opt, positionals } = parseArgs({
   allowPositionals: true,
@@ -120,7 +122,10 @@ function parseTime(text, end = false) {
 }
 
 function entries(db, contains) {
-  const where = [opt.all ? '1' : opt.trash ? 'deleted_at IS NOT NULL' : 'deleted_at IS NULL']
+  // Older files (schema v1) have no purged_at column.
+  const hasPurged = query(db, 'PRAGMA table_info(records)').some((c) => c.name === 'purged_at')
+  const notPurged = hasPurged ? 'purged_at IS NULL' : '1'
+  const where = [notPurged, opt.all ? '1' : opt.trash ? 'deleted_at IS NOT NULL' : 'deleted_at IS NULL']
   const params = []
   if (contains !== undefined) {
     where.push("content LIKE ? ESCAPE '!'")
@@ -143,15 +148,17 @@ async function main() {
       return pull()
     case 'info': {
       const db = await open()
+      const purged = query(db, 'PRAGMA table_info(records)').some((c) => c.name === 'purged_at') ? 'purged_at' : 'NULL'
       const [r] = query(db, `SELECT
         (SELECT COUNT(*) FROM records WHERE deleted_at IS NULL) AS live,
-        (SELECT COUNT(*) FROM records WHERE deleted_at IS NOT NULL) AS trashed,
+        (SELECT COUNT(*) FROM records WHERE deleted_at IS NOT NULL AND ${purged} IS NULL) AS trashed,
+        (SELECT COUNT(*) FROM records WHERE ${purged} IS NOT NULL) AS purged,
         (SELECT MIN(logged_at) FROM records WHERE deleted_at IS NULL) AS first,
         (SELECT MAX(logged_at) FROM records WHERE deleted_at IS NULL) AS last`)
       const info = { file: opt.db, fetched: statSync(opt.db).mtime.toISOString(), schemaVersion: query(db, 'PRAGMA user_version')[0].user_version,
         ...r, first: r.first && localTime(r.first), last: r.last && localTime(r.last) }
       return print(info, () => `${info.file} (fetched ${localTime(Date.parse(info.fetched))}), schema v${info.schemaVersion}\n`
-        + `${info.live} live entries, ${info.trashed} in the trash${info.first ? `, ${info.first} … ${info.last}` : ''}`)
+        + `${info.live} live entries, ${info.trashed} in the trash, ${info.purged} purged${info.first ? `, ${info.first} … ${info.last}` : ''}`)
     }
     case 'list':
       return entries(await open())

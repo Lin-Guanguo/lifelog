@@ -42,6 +42,9 @@ export async function openRecords(onChange: () => void = () => {}): Promise<Reco
       await persist()
     },
   }
+  // Purged text is overwritten on disk instead of lingering in free pages. A query, not execute():
+  // the pragma returns a row, which Android's execSQL refuses.
+  await conn.query('PRAGMA secure_delete = ON')
   await migrate(executor)
   return createRecords(executor)
 }

@@ -1,10 +1,13 @@
+import { makeId } from './ids'
+
 export interface LogRecord {
-  id: string
-  entry_id: string
+  id: number // see ids.ts
+  entry_id: number // id of the entry's first row
   logged_at: number
   content: string
   written_at: number
   deleted_at: number | null
+  purged_at: number | null // permanently deleted: content is '' and the row stays as a tombstone
 }
 
 export interface Statement {
@@ -25,6 +28,10 @@ export const HOUR_MS = 3_600_000
 export const DAY_MS = 24 * HOUR_MS
 
 const INSERT = 'INSERT INTO records (id, entry_id, logged_at, content, written_at) VALUES (?, ?, ?, ?, ?)'
+const IN_TRASH = 'deleted_at IS NOT NULL AND purged_at IS NULL'
+const PURGE = "UPDATE records SET content = '', purged_at = ?"
+
+const earliest = (a: number | null, b: number | null) => (a === null ? b : b === null ? a : Math.min(a, b))
 
 function likePattern(query: string): string {
   return `%${query.replace(/[!%_]/g, (c) => `!${c}`)}%`
@@ -37,9 +44,18 @@ function placeholders(values: unknown[]): string {
 export function createRecords(
   db: Executor,
   now: () => number = Date.now,
-  uuid: () => string = () => crypto.randomUUID(),
+  random: () => number = Math.random,
 ) {
   const select = async (sql: string, values: unknown[] = []) => (await db.query(sql, values)) as unknown as LogRecord[]
+
+  // Strictly increasing on this device, so rows made in the same millisecond (or after the clock
+  // moved back) never collide; other devices differ by the random low bits.
+  let lastId: number | undefined
+  async function newId(time: number): Promise<number> {
+    lastId ??= Number((await db.query('SELECT MAX(id) AS id FROM records'))[0]?.id ?? 0)
+    lastId = Math.max(makeId(time, Math.floor(random() * 4096)), lastId + 1)
+    return lastId
+  }
 
   return {
     listLive(): Promise<LogRecord[]> {
@@ -55,18 +71,19 @@ export function createRecords(
 
     async add(content: string): Promise<void> {
       const t = now()
-      await db.run([{ statement: INSERT, values: [uuid(), uuid(), t, content, t] }])
+      const id = await newId(t)
+      await db.run([{ statement: INSERT, values: [id, id, t, content, t] }])
     },
 
     async edit(current: LogRecord, content: string): Promise<void> {
       const t = now()
       await db.run([
         { statement: 'UPDATE records SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL', values: [t, current.id] },
-        { statement: INSERT, values: [uuid(), current.entry_id, current.logged_at, content, t] },
+        { statement: INSERT, values: [await newId(t), current.entry_id, current.logged_at, content, t] },
       ])
     },
 
-    async trashEntries(entryIds: string[]): Promise<void> {
+    async trashEntries(entryIds: number[]): Promise<void> {
       if (entryIds.length === 0) return
       await db.run([{
         statement: `UPDATE records SET deleted_at = ? WHERE deleted_at IS NULL AND entry_id IN (${placeholders(entryIds)})`,
@@ -78,8 +95,8 @@ export function createRecords(
     async listTrash(query = ''): Promise<{ trashed: LogRecord[]; live: LogRecord[] }> {
       const order = 'ORDER BY logged_at DESC, written_at DESC'
       const trashed = query
-        ? await select(`SELECT * FROM records WHERE deleted_at IS NOT NULL AND content LIKE ? ESCAPE '!' ${order}`, [likePattern(query)])
-        : await select(`SELECT * FROM records WHERE deleted_at IS NOT NULL ${order}`)
+        ? await select(`SELECT * FROM records WHERE ${IN_TRASH} AND content LIKE ? ESCAPE '!' ${order}`, [likePattern(query)])
+        : await select(`SELECT * FROM records WHERE ${IN_TRASH} ${order}`)
       const entryIds = [...new Set(trashed.map((r) => r.entry_id))]
       const live = entryIds.length
         ? await select(`SELECT * FROM records WHERE deleted_at IS NULL AND entry_id IN (${placeholders(entryIds)})`, entryIds)
@@ -88,63 +105,91 @@ export function createRecords(
     },
 
     async countTrash(): Promise<number> {
-      const rows = await db.query('SELECT COUNT(*) AS n FROM records WHERE deleted_at IS NOT NULL')
+      const rows = await db.query(`SELECT COUNT(*) AS n FROM records WHERE ${IN_TRASH}`)
       return Number(rows[0]?.n ?? 0)
     },
 
-    // At most one row per entry may be restored; the entry's live row, if any, moves to the trash.
+    // At most one row per entry may be restored. Restoring appends a new live row with the same text
+    // and time; the entry's current text moves to the trash and the restored trash row is purged.
     async restore(rows: LogRecord[]): Promise<void> {
       if (new Set(rows.map((r) => r.entry_id)).size !== rows.length) {
         throw new Error('restore: more than one row for the same entry')
       }
+      if (rows.some((r) => r.deleted_at === null || r.purged_at !== null)) throw new Error('restore: not in the trash')
       if (rows.length === 0) return
       const t = now()
-      await db.run(rows.flatMap((r) => [
+      const ids: number[] = []
+      for (let i = 0; i < rows.length; i++) ids.push(await newId(t))
+      await db.run(rows.flatMap((r, i) => [
         { statement: 'UPDATE records SET deleted_at = ? WHERE entry_id = ? AND deleted_at IS NULL', values: [t, r.entry_id] },
-        { statement: 'UPDATE records SET deleted_at = NULL WHERE id = ?', values: [r.id] },
+        { statement: INSERT, values: [ids[i], r.entry_id, r.logged_at, r.content, t] },
+        { statement: `${PURGE} WHERE id = ? AND purged_at IS NULL`, values: [t, r.id] },
       ]))
     },
 
-    async purge(ids: string[]): Promise<void> {
+    // Permanent deletion of trash rows: their content is erased, the rows stay as tombstones.
+    async purge(ids: number[]): Promise<void> {
       if (ids.length === 0) return
-      await db.run([{
-        statement: `DELETE FROM records WHERE deleted_at IS NOT NULL AND id IN (${placeholders(ids)})`,
-        values: ids,
-      }])
+      await db.run([{ statement: `${PURGE} WHERE ${IN_TRASH} AND id IN (${placeholders(ids)})`, values: [now(), ...ids] }])
     },
 
-    // Every row, live and trashed, for snapshots.
+    // Every row, including tombstones, for snapshots.
     all(): Promise<LogRecord[]> {
       return select('SELECT * FROM records ORDER BY logged_at, written_at')
     },
 
-    // Merges another copy of the log. Rows are immutable except deleted_at, so:
-    // rows missing here are added, a deletion on either side wins, and a row that would give an
-    // entry a second live text (edited on both sides) is added to the trash instead of being lost.
-    // Resolves to true when local data changed.
-    async merge(rows: LogRecord[]): Promise<boolean> {
-      if (rows.length === 0) return false
-      const t = now()
-      const insert = 'INSERT OR IGNORE INTO records (id, entry_id, logged_at, content, written_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?)'
-      const deletions = rows.filter((r) => r.deleted_at !== null).map((r) => ({
-        statement: 'UPDATE records SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL',
-        values: [r.deleted_at, r.id],
-      }))
-      // The second insert only applies when the first was rejected by the one-live-row index.
-      const inserts = rows.flatMap((r) => [
-        { statement: insert, values: [r.id, r.entry_id, r.logged_at, r.content, r.written_at, r.deleted_at] },
-        { statement: insert, values: [r.id, r.entry_id, r.logged_at, r.content, r.written_at, r.deleted_at ?? t] },
-      ])
-      return (await db.run([...deletions, ...inserts])) > 0
+    // Merges another copy of the log; resolves to whether anything changed here. Rows are append-only
+    // and only move forward (live → trashed → purged), so per row id the copy further along wins, with
+    // the earlier time when both are. If an entry ends up with two live texts (edited on two devices),
+    // the later-written one stays live and the other is trashed as of that time, the same on every copy.
+    async merge(remote: LogRecord[]): Promise<boolean> {
+      const rows = new Map((await select('SELECT * FROM records')).map((r) => [r.id, r]))
+      const liveByEntry = new Map([...rows.values()].filter((r) => r.deleted_at === null).map((r) => [r.entry_id, r]))
+      const statements: Statement[] = []
+      const update = (row: LogRecord, deletedAt: number | null, purgedAt: number | null) => {
+        if (deletedAt === row.deleted_at && purgedAt === row.purged_at) return
+        statements.push({
+          statement: "UPDATE records SET deleted_at = ?, purged_at = ?, content = CASE WHEN ? IS NULL THEN content ELSE '' END WHERE id = ?",
+          values: [deletedAt, purgedAt, purgedAt, row.id],
+        })
+        if (row.deleted_at === null && deletedAt !== null) liveByEntry.delete(row.entry_id)
+        rows.set(row.id, { ...row, deleted_at: deletedAt, purged_at: purgedAt, content: purgedAt === null ? row.content : '' })
+      }
+
+      // Rows known here first, so status changes are in place before new texts compete for live.
+      const known = remote.filter((r) => rows.has(r.id))
+      for (const r of known) {
+        const local = rows.get(r.id)!
+        const purgedAt = earliest(local.purged_at, r.purged_at)
+        update(local, earliest(local.deleted_at, r.deleted_at) ?? purgedAt, purgedAt)
+      }
+      for (const r of remote) {
+        if (rows.has(r.id)) continue
+        // A purged row is always deleted, even if a malformed copy says otherwise.
+        let row: LogRecord = { ...r, content: r.purged_at === null ? r.content : '', deleted_at: r.deleted_at ?? r.purged_at }
+        if (row.deleted_at === null) {
+          const live = liveByEntry.get(row.entry_id)
+          const newer = !live || row.written_at > live.written_at || (row.written_at === live.written_at && row.id > live.id)
+          if (live && newer) update(live, row.written_at, null)
+          if (newer) liveByEntry.set(row.entry_id, row)
+          else row = { ...row, deleted_at: live!.written_at }
+        }
+        statements.push({
+          statement: 'INSERT INTO records (id, entry_id, logged_at, content, written_at, deleted_at, purged_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          values: [row.id, row.entry_id, row.logged_at, row.content, row.written_at, row.deleted_at, row.purged_at],
+        })
+        rows.set(row.id, row)
+      }
+      if (statements.length === 0) return false
+      await db.run(statements)
+      lastId = undefined // new ids continue above whatever arrived
+      return true
     },
 
-    // retentionHours <= 0 means never clear.
+    // Trash older than the retention is purged (content erased, tombstone kept). retentionHours <= 0 means never.
     async purgeExpired(retentionHours: number): Promise<void> {
       if (retentionHours <= 0) return
-      await db.run([{
-        statement: 'DELETE FROM records WHERE deleted_at IS NOT NULL AND deleted_at < ?',
-        values: [now() - retentionHours * HOUR_MS],
-      }])
+      await db.run([{ statement: `${PURGE} WHERE ${IN_TRASH} AND deleted_at < ?`, values: [now(), now() - retentionHours * HOUR_MS] }])
     },
   }
 }

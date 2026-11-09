@@ -5,27 +5,37 @@ Entries are stored raw; organizing them is left to CyberMnema later.
 
 ## Data
 
-One SQLite table. Content is never modified in place.
+One SQLite table, append-only: rows are added, never changed except moving forward through
+live → trashed → purged (permanently deleted). That one-way rule is what makes sync merging safe.
 
 ```sql
 CREATE TABLE records (
-  id          TEXT PRIMARY KEY,   -- one row per saved text
-  entry_id    TEXT NOT NULL,      -- shared by an entry and all its edits
+  id          INTEGER PRIMARY KEY, -- one row per saved text; see below
+  entry_id    INTEGER NOT NULL,   -- shared by an entry and all its edits: the id of its first row
   logged_at   INTEGER NOT NULL,   -- original time (ms), copied on edit
   content     TEXT NOT NULL,
   written_at  INTEGER NOT NULL,   -- when this row was saved
-  deleted_at  INTEGER             -- NULL = live; set = in the trash
+  deleted_at  INTEGER,            -- NULL = live; set = in the trash
+  purged_at   INTEGER             -- set = permanently deleted: content '' (tombstone kept for sync), v2
 );
 -- at most one live row per entry
 CREATE UNIQUE INDEX records_one_live ON records(entry_id) WHERE deleted_at IS NULL;
 ```
 
+Ids are created offline on any device: `(ms since 2026-01-01) × 4096 + 12 random bits`. They are ordered by
+creation time, exact in JavaScript (below 2⁵³, until about 2095), and strictly increasing per device; two
+devices collide only if they create a row in the same millisecond with the same 12 bits.
+
 ### Schema versions
 
 The schema version is SQLite's standard `PRAGMA user_version`. `src/data/schema.ts` holds an ordered
-list of migrations (the table above is v1); on open, each missing step runs in its own transaction
+list of migrations (v1: the table with text UUIDs; v2: integer ids and `purged_at`); on open, each missing step runs in its own transaction
 together with its version bump. Databases from v0.1.x (no version, table already present) upgrade to
-v1 without changes. A database or backup from a newer app version is refused, never modified.
+v1 without changes. v2 rebuilds the table: text ids convert deterministically (time from the row, low bits
+from a hash of the old id; an entry's first row takes the entry's number), so the phone and an old backup
+convert identically and merge without duplicates; an interrupted conversion starts over on next launch.
+New installs run both steps on an empty table. A database or backup from a newer app version is refused,
+never modified.
 Shipped migrations are never edited; changes are new migrations.
 
 | Action | Effect |
@@ -33,10 +43,15 @@ Shipped migrations are never edited; changes are new migrations.
 | Send | insert a row |
 | Edit | one transaction: soft-delete the live row, insert a new row with the same `entry_id` and `logged_at` |
 | Delete (sheet, full view, multi-select) | soft-delete the entry's live row |
-| Restore (trash) | clear `deleted_at`; if the entry has a live row, it is soft-deleted first after an overwrite prompt. One row per entry per restore |
-| Delete forever (trash) | `DELETE` the selected trashed rows |
-| Auto-clear | on start and resume, delete rows trashed longer than the retention (1 / 7 / 30 days, or custom hours/days/never; default 7 days) |
-| Search | `LIKE '%q%'` on live rows; trash search on trashed rows. `%`, `_` and `!` are escaped |
+| Restore (trash) | insert a new live row with the same text, `entry_id` and `logged_at`; purge the restored trash row; if the entry has a live row, it is soft-deleted first after an overwrite prompt. One row per entry per restore |
+| Delete forever (trash) | purge the selected trashed rows: `content = ''`, `purged_at` set; the row stays as a ~60-byte tombstone |
+| Auto-clear | on start and resume, purge rows trashed longer than the retention (1 / 7 / 30 days, or custom hours/days/never; default 7 days) |
+| Search | `LIKE '%q%'` on live rows; trash search on trashed (not purged) rows. `%`, `_` and `!` are escaped |
+
+Purged text is gone from the database (`PRAGMA secure_delete` overwrites the freed bytes) and from every later
+upload. Older uploads may survive in the WebDAV server's own file history (Nutstore 历史版本) and in copies
+pulled with `scripts/lifelog.mjs` until the next pull. Tombstones are kept forever: dropping them would let a
+device that still has the text bring it back; they are tiny.
 
 Settings (retention, language, sync) live in Capacitor Preferences, not in the table.
 
@@ -49,9 +64,12 @@ table (live and trashed rows) at the current schema version, readable by any SQL
 One sync step:
 
 1. `PROPFIND` the remote file's version (ETag, or modification time + size).
-2. If it differs from the version this device last wrote or merged, download it and merge:
-   rows missing locally are added; a deletion on either side wins; a remote live text that would give
-   an entry a second live row (edited on both devices) goes to the trash instead.
+2. If it differs from the version this device last wrote or merged, download it and merge. Per row id the
+   copy further along wins (live < trashed < purged; when both are trashed or purged, the earlier time);
+   a purged row erases the text everywhere; rows missing locally are added. If an entry ends up with two
+   live texts (edited on two devices), the later-written stays live and the other is trashed as of that
+   time. Every copy computes the same result, so devices converge in any sync order (tested with random
+   two-device runs).
 3. Upload only if the server lacks something (local changes, data changed by the merge, or no file
    yet) with a plain `PUT` over `lifelog.sqlite`. Otherwise just adopt the remote version (no ping-pong
    between devices). Uploading to a temporary name and `MOVE`-ing it over the target is not portable:
@@ -62,8 +80,8 @@ Automatic sync runs on start, on resume and every minute while open, but only on
 interval (5 minutes / 1 hour / 1 day, or custom minutes/hours/days or manual only; default 1 day) has passed since the last sync or
 failed attempt. "Sync now" runs immediately. A fresh install restores itself by merging the backup.
 
-Known limit: rows deleted forever on one device come back (into the trash) when merged from a
-device that still has them; tombstones would be needed to prevent that.
+A newer schema in the remote file stops sync with an error on older app versions (they never merge what they
+cannot read), so update every device after a schema change.
 
 On Android, requests go through a small native plugin (OkHttp, `WebDavHttpPlugin`), because the
 WebView's `fetch` is subject to CORS and Capacitor's HTTP plugin cannot send WebDAV methods.
