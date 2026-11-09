@@ -48,6 +48,8 @@ jobs:
         run: |
           echo "$KEYSTORE_BASE64" | base64 -d > "$LIFELOG_KEYSTORE"
           cd android  # mise x: its JAVA_HOME/ANDROID_HOME, not the runner's preinstalled JDK
+          # The Gradle distribution download fails now and then (timeouts, 504s): retry it first.
+          for attempt in 1 2 3; do mise x -- ./gradlew --no-daemon --version >/dev/null && break; [ $attempt = 3 ] && exit 1; sleep 30; done
           mise x -- ./gradlew --no-daemon :app:testDebugUnitTest assembleRelease
           cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/lifelog-$VERSION.apk"
           mise x -- apksigner verify --print-certs "$RUNNER_TEMP/lifelog-$VERSION.apk" | grep SHA-256
