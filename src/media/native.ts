@@ -14,6 +14,7 @@ interface PhotosPlugin {
   read(options: { name: string }): Promise<{ data: string }>
   write(options: { name: string; data: string }): Promise<void>
   remove(options: { name: string; keepSince?: number }): Promise<void>
+  dir(): Promise<{ path: string }>
   upload(options: { name: string; url: string; headers: Record<string, string> }): Promise<{ status: number }>
   download(options: { name: string; url: string; headers: Record<string, string> }): Promise<{ status: number }>
   preview(options: { name: string }): Promise<{ path?: string }>
@@ -26,6 +27,7 @@ interface PhotosPlugin {
 const Photos = registerPlugin<PhotosPlugin>('Photos')
 
 let names: Promise<Set<string>> | undefined
+let dir: Promise<string> | undefined
 const known = () => (names ??= Photos.list().then(
   (r) => new Set(r.files.map((f) => f.name)),
   (error: unknown) => {
@@ -77,6 +79,11 @@ export const nativePlatform: PhotoPlatform = {
     if (!(await known()).has(file)) return null
     const { path } = await Photos.preview({ name: file })
     return path ? Capacitor.convertFileSrc(`file://${path}`) : null
+  },
+  async original(file) {
+    if (!(await known()).has(file)) return null
+    dir ??= Photos.dir().then((r) => r.path)
+    return Capacitor.convertFileSrc(`file://${await dir}/${file}`)
   },
   open: (photo) => Photos.open({ name: photo.file }),
   share: (photo) => Photos.share({ name: photo.file }),

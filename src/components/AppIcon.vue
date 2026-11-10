@@ -17,6 +17,7 @@ const PATHS = {
   download: 'M12 4v11M7 10l5 5 5-5M5 20h14',
   share: 'M12 15V4M8 8l4-4 4 4M5 12v8h14v-8',
   open: 'M14 4h6v6M20 4l-9 9M18 14v6H4V6h6',
+  more: 'M5 12h.5M12 12h.5M19 12h.5',
 } as const
 
 defineProps<{ name: keyof typeof PATHS; size?: number }>()

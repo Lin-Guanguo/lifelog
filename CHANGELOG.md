@@ -3,6 +3,13 @@
 Each release's notes come from its section here (the release workflow requires one) and are shown in the app's
 update dialog.
 
+## 0.4.5
+
+- 🖼 is back to the system photo picker (the document picker was awkward to use). On some phones (HyperOS) it hands
+  over a copy with part of the EXIF removed; LifeLog keeps what it is handed.
+- Photo viewer: four actions along the bottom: 原图 (the full-resolution original in place of the 1600 px display),
+  打开, 保存, 分享.
+
 ## 0.4.4
 
 - LifeLog keeps each photo's **original**, byte for byte, instead of a compressed copy: inside the app only (the

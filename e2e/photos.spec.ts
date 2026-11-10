@@ -65,7 +65,13 @@ test('photos: add, choose the time, lay out, view, sync', async ({ page, browser
   await expect(viewer).toContainText('2 / 2')
   // LifeLog keeps the original: its format and size, byte for byte.
   await expect(viewer).toContainText(`JPEG · `)
-  await expect(viewer.getByRole('button', { name: '用其他应用打开' })).toHaveCount(1)
+  // The 2400 px original is larger than the 1600 px display: 原图 loads it in place, then is done.
+  await viewer.getByRole('button', { name: '查看原图' }).click()
+  await expect(viewer.locator('img.original')).toHaveCount(1)
+  await expect(viewer.getByRole('button', { name: '查看原图' })).toBeDisabled()
+  await expect(viewer.getByRole('button', { name: '查看原图' })).toContainText('已是原图')
+  await expect(viewer.getByRole('button', { name: '用其他应用打开' })).toBeVisible()
+  // Saving once, then it says it is there.
   const download = page.waitForEvent('download')
   await viewer.getByRole('button', { name: '保存到相册' }).click()
   expect((await download).suggestedFilename()).toMatch(/^[0-9a-f]{32}\.jpg$/)

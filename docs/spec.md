@@ -90,8 +90,8 @@ asked. An entry's text references the photo by a line of its own; nothing else i
   in the tray or an unsaved edit is not referenced yet; adding a photo again refreshes its date). The check uses the
   same snapshot as the upload. Files on the server are never deleted.
 
-Adding photos (Android, no permissions): the system document picker (several at once; it hands over the files
-themselves, where some phones' photo pickers hand over stripped copies), the system camera (one photo, written into
+Adding photos (Android, no permissions): the system photo picker (several at once; some phones' pickers, e.g.
+HyperOS, hand over a copy with part of the EXIF removed, and LifeLog keeps what it is handed), the system camera (one photo, written into
 LifeLog's cache and kept like any other; not added to the gallery), or Share → LifeLog from another app. A quick send puts the text first and the photos after
 it; 排版 (layout) opens the draft in the editor to place photos between paragraphs. Photos in a row form one group
 laid out by count: 1 keeps its shape (≤160 px tall, ≤70 % wide, cropped to 3:4 … 2:1), 2 side by side, 3 in a row,
@@ -150,11 +150,11 @@ JavaScript or have to fit in memory.
 - **Edit** (and **New entry**, from 排版): text fields and photo thumbnails, no formatting; camera / gallery insert at the
   cursor; long-press a photo to move it (the entry shrinks to an overview, the bottom bar becomes a remove zone).
   Explicit Save; leaving with changes (back arrow or Android back) asks Save / Discard / Keep editing. Unchanged text saves nothing.
-- **Photo viewer** (tap a photo in the sheet): full screen, swipe between photos; the capture time and the file's
-  format and size. 打开 (open) hands the photo to another app (Android's open-with list: the gallery copy when exported,
-  else LifeLog's file), 分享 (share) sends LifeLog's file, 保存 (save) exports a copy to the gallery's LifeLog album as
-  `LifeLog_<file>`, dated by the capture time, once: when it is there (also under 0.4.x names), the button shows
-  已在相册. A photo another device added is downloaded first.
+- **Photo viewer** (tap a photo in the sheet): full screen, swipe between photos; close and position on top. Below:
+  capture time, format and size, then four actions: 原图 (when the original is larger than the 1600 px display and
+  not HEIC, loads it in place; otherwise 已是原图), 打开 (Android's open-with list: the gallery copy when exported, else
+  LifeLog's file), 保存 (exports a copy to the gallery's LifeLog album as `LifeLog_<file>`, dated by the capture time,
+  once; then 已在相册, also for 0.4.x names), 分享 (the original). A photo another device added is downloaded first.
 - **Search**: highlighted matches grouped by day; tap opens the sheet.
 - **Settings**: language (system / 中文 / English); trash auto-clear period (presets + custom dialog) and trash entry; photo copies (count, size); WebDAV sync (connection, status, sync now, interval); about (check for updates, author pop-up). The main header shows a sync status chip.
 - **Trash**: search box; cards grouped by entry (current text shown for reference); rows show original/saved time and days left; select rows or whole entries; restore or delete forever.

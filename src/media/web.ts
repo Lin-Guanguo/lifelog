@@ -132,6 +132,7 @@ export const webPlatform: PhotoPlatform = {
   onShared: () => {},
   has: async (file) => !!(await get(file)),
   preview: (file) => files.url(file),
+  original: (file) => files.url(file),
   async open(photo) {
     const url = await files.url(photo.file)
     if (url) window.open(url, '_blank')

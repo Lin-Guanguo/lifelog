@@ -2,7 +2,6 @@ package dev.linguanguo.lifelog;
 
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
-import android.content.ClipData;
 import android.content.ContentResolver;
 import android.content.ContentUris;
 import android.content.ContentValues;
@@ -17,6 +16,8 @@ import android.os.Parcelable;
 import android.provider.MediaStore;
 import android.util.Base64;
 import androidx.activity.result.ActivityResult;
+import androidx.activity.result.PickVisualMediaRequest;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.core.content.FileProvider;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
@@ -46,7 +47,7 @@ import okhttp3.Response;
 import okhttp3.ResponseBody;
 
 /**
- * Photos for entries. Every photo handed to LifeLog (system document picker, system camera, Share → LifeLog) is kept
+ * Photos for entries. Every photo handed to LifeLog (system photo picker, system camera, Share → LifeLog) is kept
  * as its complete original in the app's private files/media, which the gallery never sees. The originals can be
  * opened or shared with other apps, and exported to the gallery's LifeLog album on request. No permission needed.
  */
@@ -119,30 +120,25 @@ public class PhotosPlugin extends Plugin {
 
     // Adding photos
 
-    /** The system document picker: it hands over the files themselves (the photo picker on some phones hands over copies). */
+    private static final int PICK_MAX = 30;
+
+    /**
+     * The system photo picker, several at once. Some phones' pickers (e.g. HyperOS) hand over a copy with part of the
+     * EXIF removed; LifeLog keeps what it is handed.
+     */
     @PluginMethod
     public void pick(PluginCall call) {
-        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("image/*");
-        intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
-        try {
-            startActivityForResult(call, intent, "picked");
-        } catch (ActivityNotFoundException e) {
-            call.reject("no document picker");
-        }
+        PickVisualMediaRequest request = new PickVisualMediaRequest.Builder()
+            .setMediaType(ActivityResultContracts.PickVisualMedia.ImageOnly.INSTANCE)
+            .build();
+        Intent intent = new ActivityResultContracts.PickMultipleVisualMedia(PICK_MAX).createIntent(getContext(), request);
+        startActivityForResult(call, intent, "picked");
     }
 
     @ActivityCallback
     private void picked(PluginCall call, ActivityResult result) {
         if (call == null) return;
-        List<Uri> uris = new ArrayList<>();
-        Intent data = result.getData();
-        if (result.getResultCode() == Activity.RESULT_OK && data != null) {
-            ClipData clip = data.getClipData();
-            if (clip != null) for (int i = 0; i < clip.getItemCount(); i++) uris.add(clip.getItemAt(i).getUri());
-            else if (data.getData() != null) uris.add(data.getData());
-        }
+        List<Uri> uris = new ActivityResultContracts.PickMultipleVisualMedia(PICK_MAX).parseResult(result.getResultCode(), result.getData());
         importAll(call, uris, null);
     }
 

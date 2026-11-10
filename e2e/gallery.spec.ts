@@ -132,8 +132,9 @@ async function capture(browser: Browser, theme: Theme) {
   await shot('Sheet', 'Text, then the photos as one group: 1 keeps its shape (≤160 px tall), 2 side by side, '
     + '3 in a row, 4 as 2×2, 5+ in rows of three.')
   await sheet.locator('.tile').first().click()
-  await shot('Viewer', 'LifeLog keeps each photo’s original (private to the app, not in the system gallery). 打开 opens it '
-    + 'with another app, 保存 saves a copy to the gallery’s LifeLog album once (then 已在相册), 分享 shares the original.')
+  await shot('Viewer', 'LifeLog keeps each photo’s original (private to the app, not in the system gallery). Below the '
+    + 'time, format and size: 原图 (the full-resolution original in place of the 1600 px display, when larger), 打开 '
+    + '(with another app), 保存 (a copy in the gallery’s LifeLog album, once; then 已在相册), 分享 (the original).')
   await page.getByRole('button', { name: '关闭' }).click()
   await sheet.getByRole('button', { name: '编辑' }).click()
   await expect(page.locator('.editor .thumb img')).toHaveCount(3)

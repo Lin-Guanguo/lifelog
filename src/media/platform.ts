@@ -12,6 +12,7 @@ export interface PhotoPlatform {
   onShared(listener: () => void): void
   has(file: string): Promise<boolean> // the photo's file is on this device
   preview(file: string): Promise<string | null> // a URL to display a photo kept here; null when it is not here
+  original(file: string): Promise<string | null> // a URL of the original file itself, at full resolution
   open(photo: PhotoRef): Promise<void> // with another app
   share(photo: PhotoRef): Promise<void>
   isExported(photo: PhotoRef): Promise<boolean>
