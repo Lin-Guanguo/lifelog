@@ -3,6 +3,18 @@
 Each release's notes come from its section here (the release workflow requires one) and are shown in the app's
 update dialog.
 
+## 0.4.3
+
+- Photo viewer: saving a photo that is already in the gallery's LifeLog folder (saved before, or the camera original)
+  shows 已在相册 instead of saving another copy. Camera originals there are found again even when the link kept on
+  the phone is gone (e.g. app data cleared).
+- After saving, 打开 opens the saved copy and 分享 shares it (until then only an original could be opened).
+- Photo lines keep more about the original: camera and lens, focal length, aperture, shutter, ISO, exposure
+  compensation, flash, white balance, location, altitude, direction, speed, format and size. Camera photos keep
+  their location (it was read from the gallery copy, where Android removes it).
+- Saving puts the copy itself in the gallery (WebP, no re-encoding, dated by the capture time), named by the whole
+  key (`LifeLog_<key>.webp`); copies saved earlier as JPEG are still found.
+
 ## 0.4.2
 
 - Photo viewer: the button that opens the original is now called 打开 (open with another app), which is what it does.

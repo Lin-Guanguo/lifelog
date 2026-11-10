@@ -16,6 +16,23 @@ describe('photo lines', () => {
     expect(parsePhotoLine(line)).toEqual(FULL)
   })
 
+  it('keep EXIF facts, with spaces and % in values, and fields they do not know', () => {
+    const rich: PhotoRef = {
+      ...FULL,
+      meta: { make: 'Google', model: 'Pixel 8 Pro', lens: 'Pixel 8 Pro back camera 6.9mm f/1.68', focal: '6.9', focal35: '24',
+        f: '1.7', exposure: '1/120', iso: '100', flash: '0', gps: '31.230416,121.473701', alt: '12.5', format: 'jpeg',
+        bytes: '4213876', ev: '-0.7', future: '50%', 'x.y-z': 'kept' },
+    }
+    const line = photoLine(rich)
+    expect(line).toContain('model=Pixel%208%20Pro ')
+    expect(line).toContain('future=50%25 ')
+    expect(line).toMatch(/ path=DCIM\/Camera\/IMG_20261110_140212\.jpg"\)$/)
+    expect(parsePhotoLine(line)).toEqual(rich)
+    // written by 0.4.0/0.4.1: no meta
+    expect(parsePhotoLine(`![](media/${KEY}.webp "taken=2026-11-10T14:02:12+08:00 size=4032x3024 path=My Album/a b.jpg")`))
+      .toEqual({ file: `${KEY}.webp`, taken: '2026-11-10T14:02:12+08:00', width: 4032, height: 3024, path: 'My Album/a b.jpg' })
+  })
+
   it('accept a bare reference and keep a path with spaces, quotes and backslashes', () => {
     expect(parsePhotoLine(`![](media/${KEY}.jpg)`)).toEqual({ file: `${KEY}.jpg` })
     const odd = { file: `${KEY}.webp`, path: 'Pictures/My "Trip" \\ 2026/a b.jpg' }

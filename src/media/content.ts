@@ -1,12 +1,16 @@
 // Photos live in an entry's text as lines of their own (docs/spec.md → Photos):
-//   ![](media/<key>.webp "taken=2026-11-10T14:02:12+08:00 size=4032x3024 path=DCIM/Camera/IMG_1.jpg")
-// <key> is a hash of the original file; the title fields are optional hints about the original.
+//   ![](media/<key>.webp "taken=2026-11-10T14:02:12+08:00 size=4032x3024 model=Pixel%208 gps=31.23,121.47 path=DCIM/Camera/IMG_1.jpg")
+// <key> is a hash of the original file; the title fields are optional facts about the original: space-separated
+// name=value tokens (spaces and % in values written as %20 and %25), path last and as is.
 
 export interface PhotoRef {
   file: string // '<key>.webp' (or .jpg), under media/
   taken?: string // capture time, ISO 8601 with offset
   width?: number // the original's size
   height?: number
+  // Other facts from the original's EXIF, in order: make, model, lens, focal, focal35, f, exposure, iso, flash, gps,
+  // alt, format, bytes; fields this version does not know are kept as they are.
+  meta?: Record<string, string>
   path?: string // where the original was found; a hint, may be gone
 }
 
@@ -20,23 +24,33 @@ export function parsePhotoLine(line: string): PhotoRef | null {
   if (!match) return null
   const photo: PhotoRef = { file: match[1] }
   const title = (match[2] ?? '').replace(/\\(.)/g, '$1')
-  const taken = /(?:^| )taken=(\S+)/.exec(title)
-  const size = /(?:^| )size=(\d+)x(\d+)(?= |$)/.exec(title)
-  const path = /(?:^| )path=(.+)$/.exec(title)
-  if (taken) photo.taken = taken[1]
-  if (size) {
-    photo.width = Number(size[1])
-    photo.height = Number(size[2])
+  const at = title.search(/(?:^| )path=/)
+  if (at >= 0) photo.path = title.slice(at).replace(/^ ?path=/, '')
+  for (const token of (at >= 0 ? title.slice(0, at) : title).split(' ')) {
+    const eq = token.indexOf('=')
+    if (eq <= 0) continue
+    const name = token.slice(0, eq)
+    const value = token.slice(eq + 1).replace(/%(20|25)/g, (_, c: string) => (c === '20' ? ' ' : '%'))
+    const size = name === 'size' && /^(\d+)x(\d+)$/.exec(value)
+    if (name === 'taken') photo.taken = value
+    else if (size) {
+      photo.width = Number(size[1])
+      photo.height = Number(size[2])
+    } else photo.meta = { ...photo.meta, [name]: value }
   }
-  if (path) photo.path = path[1]
   return photo
 }
 
+const encode = (value: string) => value.replace(/%/g, '%25').replace(/[\s]+/g, '%20')
+
 export function photoLine(photo: PhotoRef): string {
   const fields = [
-    photo.taken && `taken=${photo.taken}`,
+    photo.taken && `taken=${encode(photo.taken)}`,
     photo.width && photo.height && `size=${photo.width}x${photo.height}`,
-    photo.path && `path=${photo.path.replace(/[\r\n]+/g, ' ')}`, // last: folder names may contain spaces
+    // Any name a line can carry back (no spaces, '=' or quotes), so fields from newer versions survive a save.
+    ...Object.entries(photo.meta ?? {}).filter(([name, value]) => /^[^\s="\\]+$/.test(name) && name !== 'path' && value !== '')
+      .map(([name, value]) => `${name}=${encode(value)}`),
+    photo.path && `path=${photo.path.replace(/[\r\n]+/g, ' ')}`, // last and as is: folder names may contain spaces
   ].filter(Boolean).join(' ')
   const title = fields.replace(/[\\"]/g, (c) => `\\${c}`)
   return `![](media/${photo.file}${title ? ` "${title}"` : ''})`

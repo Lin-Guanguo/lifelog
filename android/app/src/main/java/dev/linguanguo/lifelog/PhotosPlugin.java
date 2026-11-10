@@ -3,13 +3,11 @@ package dev.linguanguo.lifelog;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.ContentResolver;
+import android.content.ContentUris;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.Intent;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.media.ExifInterface;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
@@ -38,6 +36,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * Photos for entries: the system photo picker, the system camera (the photo is saved to the gallery),
@@ -222,9 +221,13 @@ public class PhotosPlugin extends Plugin {
                 }
                 if (capture != null) {
                     try {
-                        Uri original = Build.VERSION.SDK_INT >= 29 ? addToGallery(capture, null, 0) : null;
-                        Uri source = original != null ? original : Uri.fromFile(capture);
-                        list.put(describe(PhotoImport.run(getContext().getContentResolver(), source, dir), original));
+                        // Read from the camera's file: the gallery entry's location would be removed for LifeLog.
+                        PhotoImport.Result r = PhotoImport.run(getContext().getContentResolver(), Uri.fromFile(capture), dir);
+                        String name = "IMG_" + new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.ROOT).format(new Date()) + ".jpg";
+                        Uri original = Build.VERSION.SDK_INT >= 29 ? addToGallery(capture, name, "image/jpeg", 0) : null;
+                        r.path = original != null ? Environment.DIRECTORY_PICTURES + "/" + ALBUM + "/" + name : null;
+                        r.meta.putIfAbsent("format", "jpeg"); // the camera writes JPEG; a cache file has no type
+                        list.put(describe(r, original));
                     } catch (IOException | RuntimeException e) {
                         captureError = e.getMessage();
                     } finally {
@@ -247,24 +250,29 @@ public class PhotosPlugin extends Plugin {
         photo.put("width", r.width);
         photo.put("height", r.height);
         if (r.path != null) photo.put("path", r.path);
+        if (!r.meta.isEmpty()) {
+            JSObject meta = new JSObject();
+            for (Map.Entry<String, String> field : r.meta.entrySet()) meta.put(field.getKey(), field.getValue());
+            photo.put("meta", meta);
+        }
         if (original != null) photo.put("uri", original.toString());
         return photo;
     }
 
-    /** Adds a JPEG to the gallery's LifeLog album (Android 10+). The gallery reads its EXIF for the date taken. */
-    private Uri addToGallery(File jpeg, String name, long takenMs) throws IOException {
+    /** Adds a file to the gallery's LifeLog album (Android 10+), dated by takenMs if given, else by its EXIF. */
+    private Uri addToGallery(File source, String name, String mime, long takenMs) throws IOException {
         ContentResolver resolver = getContext().getContentResolver();
         ContentValues values = new ContentValues();
         String stamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.ROOT).format(new Date());
         values.put(MediaStore.MediaColumns.DISPLAY_NAME, name != null ? name : "IMG_" + stamp + ".jpg");
-        values.put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg");
+        values.put(MediaStore.MediaColumns.MIME_TYPE, mime);
         values.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/" + ALBUM);
         if (takenMs > 0) values.put(MediaStore.Images.ImageColumns.DATE_TAKEN, takenMs);
         values.put(MediaStore.MediaColumns.IS_PENDING, 1);
         Uri target = resolver.insert(MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY), values);
         if (target == null) throw new IOException("cannot add to the gallery");
         try {
-            try (OutputStream out = resolver.openOutputStream(target); InputStream in = new FileInputStream(jpeg)) {
+            try (OutputStream out = resolver.openOutputStream(target); InputStream in = new FileInputStream(source)) {
                 if (out == null) throw new IOException("cannot write to the gallery");
                 byte[] buffer = new byte[64 * 1024];
                 for (int n; (n = in.read(buffer)) > 0; ) out.write(buffer, 0, n);
@@ -414,7 +422,67 @@ public class PhotosPlugin extends Plugin {
         }
     }
 
-    /** Saves the copy to the gallery's LifeLog album as a JPEG, with the capture time written back. */
+    /** The copy saved to the gallery: the copy's own file, named by the whole key (LifeLog_<key>.webp). */
+    private static String savedName(String file) {
+        return "LifeLog_" + file;
+    }
+
+    private String displayName(Uri uri) {
+        try (android.database.Cursor cursor = getContext().getContentResolver()
+            .query(uri, new String[] { MediaStore.MediaColumns.DISPLAY_NAME }, null, null, null)) {
+            return cursor != null && cursor.moveToFirst() ? cursor.getString(0) : null;
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    /** A saved copy, or one saved by 0.4.1–0.4.2 as JPEG under the first 12 characters of the key. */
+    private Uri savedCopy(String file) {
+        Uri saved = inAlbum(savedName(file));
+        return saved != null || file.length() < 12 ? saved : inAlbum("LifeLog_" + file.substring(0, 12) + ".jpg");
+    }
+
+    /** A photo with this name in the gallery's LifeLog album (only LifeLog's own entries are visible), or null. */
+    private Uri inAlbum(String displayName) {
+        if (Build.VERSION.SDK_INT < 29 || displayName == null) return null;
+        Uri images = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY);
+        String[] projection = { MediaStore.MediaColumns._ID };
+        String where = MediaStore.MediaColumns.DISPLAY_NAME + " = ? AND " + MediaStore.MediaColumns.RELATIVE_PATH + " LIKE ?";
+        String[] args = { displayName, Environment.DIRECTORY_PICTURES + "/" + ALBUM + "%" };
+        try (android.database.Cursor cursor = getContext().getContentResolver().query(images, projection, where, args, null)) {
+            if (cursor != null && cursor.moveToFirst()) return ContentUris.withAppendedId(images, cursor.getLong(0));
+        } catch (RuntimeException ignored) {
+            // Treated as not there.
+        }
+        return null;
+    }
+
+    /**
+     * What LifeLog's album holds of this photo: the original (a camera photo, by its file name, checked by hash) or a
+     * saved copy. Finds originals whose remembered link is gone (e.g. app data cleared); after a reinstall Android no
+     * longer shows LifeLog the files its earlier install made.
+     */
+    @PluginMethod
+    public void inAlbum(PluginCall call) {
+        String file = call.getString("name", "");
+        String original = call.getString("original");
+        getBridge().execute(() -> {
+            JSObject ret = new JSObject();
+            try {
+                Uri uri = inAlbum(original);
+                if (uri != null && file.startsWith(PhotoImport.hash(getContext().getContentResolver(), uri) + ".")) {
+                    ret.put("original", uri.toString());
+                }
+            } catch (IOException | RuntimeException ignored) {
+                // Not the same photo, or unreadable.
+            }
+            Uri saved = file.length() > 12 ? savedCopy(file) : null;
+            if (saved != null) ret.put("saved", saved.toString());
+            call.resolve(ret);
+        });
+    }
+
+    /** Saves the copy to the gallery's LifeLog album as it is (WebP), dated by the capture time, unless it is there. */
     @PluginMethod
     public void saveCopy(PluginCall call) {
         if (Build.VERSION.SDK_INT < 29) {
@@ -423,35 +491,42 @@ public class PhotosPlugin extends Plugin {
         }
         String taken = call.getString("taken");
         getBridge().execute(() -> {
-            File jpeg = new File(getContext().getCacheDir(), "save.jpg");
             try {
                 File source = mediaFile(call);
-                Bitmap bitmap = BitmapFactory.decodeFile(source.getPath());
-                if (bitmap == null) throw new IOException("cannot decode " + source.getName());
-                try (OutputStream out = new FileOutputStream(jpeg)) {
-                    bitmap.compress(Bitmap.CompressFormat.JPEG, 92, out);
-                } finally {
-                    bitmap.recycle();
+                Uri existing = savedCopy(source.getName());
+                if (existing != null) {
+                    JSObject ret = new JSObject();
+                    ret.put("existed", true);
+                    ret.put("uri", existing.toString());
+                    call.resolve(ret);
+                    return;
                 }
                 long takenMs = 0;
-                if (taken != null && taken.length() >= 19) {
-                    ExifInterface exif = new ExifInterface(jpeg.getPath());
-                    exif.setAttribute(ExifInterface.TAG_DATETIME_ORIGINAL, taken.substring(0, 19).replace('-', ':').replace('T', ' '));
-                    if (taken.length() > 19) exif.setAttribute("OffsetTimeOriginal", taken.substring(19));
-                    exif.saveAttributes();
+                if (taken != null) {
                     try {
                         takenMs = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.ROOT).parse(taken).getTime();
                     } catch (java.text.ParseException ignored) {
                         // Left to the gallery.
                     }
                 }
-                addToGallery(jpeg, "LifeLog_" + source.getName().substring(0, 12) + ".jpg", takenMs);
-                call.resolve();
+                // The copy has no EXIF; the gallery's date taken is set instead.
+                String mime = source.getName().endsWith(".jpg") ? "image/jpeg" : "image/webp";
+                String name = savedName(source.getName());
+                Uri saved = addToGallery(source, name, mime, takenMs);
+                JSObject ret = new JSObject();
+                // A file of that name LifeLog cannot see (made before a reinstall) makes Android rename this one
+                // ("… (1).webp"): it was saved before, so the new one is removed again.
+                if (!name.equals(displayName(saved))) {
+                    getContext().getContentResolver().delete(saved, null, null);
+                    ret.put("existed", true);
+                    call.resolve(ret);
+                    return;
+                }
+                ret.put("existed", false);
+                ret.put("uri", saved.toString());
+                call.resolve(ret);
             } catch (IOException | RuntimeException e) {
                 call.reject(e.getMessage());
-            } finally {
-                //noinspection ResultOfMethodCallIgnored
-                jpeg.delete();
             }
         });
     }

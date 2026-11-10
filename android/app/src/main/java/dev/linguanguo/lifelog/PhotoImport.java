@@ -21,6 +21,8 @@ import java.security.NoSuchAlgorithmException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Locale;
 import java.util.TimeZone;
 
@@ -40,6 +42,7 @@ final class PhotoImport {
         int width;
         int height;
         String path; // folder/name of the original when known, or just its name
+        final Map<String, String> meta = new LinkedHashMap<>(); // more EXIF facts (photo line fields), in order
     }
 
     private PhotoImport() {}
@@ -54,6 +57,7 @@ final class PhotoImport {
         if (exif != null) {
             orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
             result.taken = takenFromExif(exif.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL), exif.getAttribute("OffsetTimeOriginal"));
+            readMeta(exif, result.meta);
         }
 
         BitmapFactory.Options bounds = new BitmapFactory.Options();
@@ -68,6 +72,10 @@ final class PhotoImport {
         result.height = turned ? bounds.outWidth : bounds.outHeight;
 
         describe(resolver, uri, result);
+        String type = resolver.getType(uri);
+        if (type != null && type.startsWith("image/")) result.meta.put("format", type.substring(6));
+        long bytes = size(resolver, uri);
+        if (bytes > 0) result.meta.put("bytes", Long.toString(bytes));
 
         File out = new File(mediaDir, result.file);
         if (!out.exists()) writeCopy(resolver, uri, bounds, orientation, out);
@@ -95,6 +103,80 @@ final class PhotoImport {
         InputStream in = resolver.openInputStream(uri);
         if (in == null) throw new IOException("cannot open " + uri);
         return in;
+    }
+
+    private static long size(ContentResolver resolver, Uri uri) {
+        try (ParcelFileDescriptor fd = resolver.openFileDescriptor(uri, "r")) {
+            return fd != null ? fd.getStatSize() : -1;
+        } catch (IOException | RuntimeException e) {
+            return -1;
+        }
+    }
+
+    /**
+     * Everything useful EXIF says about how and where the photo was taken, as photo line fields. Location is read only
+     * when the source is not redacted: Android removes it from gallery files for apps without location access, so camera
+     * photos are read from the camera's own file.
+     */
+    static void readMeta(ExifInterface exif, Map<String, String> meta) {
+        put(meta, "make", exif.getAttribute(ExifInterface.TAG_MAKE));
+        put(meta, "model", exif.getAttribute(ExifInterface.TAG_MODEL));
+        put(meta, "lensmake", exif.getAttribute("LensMake"));
+        put(meta, "lens", exif.getAttribute("LensModel"));
+        put(meta, "focal", number(exif.getAttributeDouble(ExifInterface.TAG_FOCAL_LENGTH, -1)));
+        put(meta, "focal35", positive(exif.getAttributeInt("FocalLengthIn35mmFilm", -1)));
+        put(meta, "f", number(exif.getAttributeDouble(ExifInterface.TAG_F_NUMBER, -1)));
+        double exposure = exif.getAttributeDouble(ExifInterface.TAG_EXPOSURE_TIME, -1);
+        // 1/n for short exposures; long ones (0.6 s, 2 s) as seconds.
+        if (exposure > 0) put(meta, "exposure", exposure <= 0.5 ? "1/" + Math.round(1 / exposure) : number(exposure));
+        int iso = exif.getAttributeInt("PhotographicSensitivity", -1);
+        put(meta, "iso", positive(iso > 0 ? iso : exif.getAttributeInt("ISOSpeedRatings", -1)));
+        String bias = exif.getAttribute("ExposureBiasValue");
+        if (bias != null) put(meta, "ev", signed(exif.getAttributeDouble("ExposureBiasValue", 0)));
+        int flash = exif.getAttributeInt(ExifInterface.TAG_FLASH, -1);
+        if (flash >= 0) meta.put("flash", (flash & 1) == 1 ? "1" : "0");
+        int wb = exif.getAttributeInt(ExifInterface.TAG_WHITE_BALANCE, -1);
+        if (wb >= 0) meta.put("wb", wb == 0 ? "auto" : "manual");
+        put(meta, "program", nonNegative(exif.getAttributeInt("ExposureProgram", -1)));
+        put(meta, "metering", nonNegative(exif.getAttributeInt("MeteringMode", -1)));
+        double zoom = exif.getAttributeDouble("DigitalZoomRatio", 0);
+        if (zoom > 1) put(meta, "zoom", number(zoom));
+        put(meta, "scene", nonNegative(exif.getAttributeInt("SceneCaptureType", -1)));
+        float[] latLong = new float[2];
+        @SuppressWarnings("deprecation") boolean located = exif.getLatLong(latLong);
+        if (located && !(latLong[0] == 0 && latLong[1] == 0)) {
+            meta.put("gps", String.format(Locale.ROOT, "%.6f,%.6f", latLong[0], latLong[1]));
+            double alt = exif.getAltitude(Double.NaN);
+            if (!Double.isNaN(alt)) put(meta, "alt", String.format(Locale.ROOT, "%.1f", alt));
+            put(meta, "dir", number(exif.getAttributeDouble("GPSImgDirection", -1)));
+            double speed = exif.getAttributeDouble("GPSSpeed", -1);
+            String unit = exif.getAttribute("GPSSpeedRef"); // K km/h, M mph, N knots
+            if (speed >= 0 && unit != null) put(meta, "speed", number(speed) + unit);
+        }
+        put(meta, "software", exif.getAttribute(ExifInterface.TAG_SOFTWARE));
+    }
+
+    private static void put(Map<String, String> meta, String name, String value) {
+        if (value != null && !value.trim().isEmpty()) meta.put(name, value.trim().replaceAll("\\s+", " "));
+    }
+
+    /** A non-negative number with up to two decimals; null for the "missing" markers (negative, NaN). */
+    private static String number(double value) {
+        return value < 0 || Double.isNaN(value) ? null : signed(value);
+    }
+
+    private static String signed(double value) {
+        if (Double.isNaN(value)) return null;
+        String text = String.format(Locale.ROOT, "%.2f", value).replaceAll("\\.?0+$", "");
+        return "-0".equals(text) ? "0" : text;
+    }
+
+    private static String positive(int value) {
+        return value > 0 ? Integer.toString(value) : null;
+    }
+
+    private static String nonNegative(int value) {
+        return value >= 0 ? Integer.toString(value) : null;
     }
 
     static String hash(ContentResolver resolver, Uri uri) throws IOException {

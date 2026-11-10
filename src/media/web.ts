@@ -128,6 +128,7 @@ export const webPlatform: PhotoPlatform = {
   takeShared: async () => [],
   onShared: () => {},
   hasOriginal: async () => false,
+  inAlbum: async () => ({}),
   openOriginal: async () => {},
   async share(file) {
     const bytes = await files.read(file)
@@ -137,5 +138,6 @@ export const webPlatform: PhotoPlatform = {
   },
   async saveCopy(photo) {
     await download(photo.file, contentType(photo.file), await files.read(photo.file))
+    return { existed: false }
   },
 }

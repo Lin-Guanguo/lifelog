@@ -23,6 +23,7 @@ A photo is a line of its own, with a blank line around it:
 
 - `taken`: capture time (EXIF, with offset when present; else the gallery's date taken). The dependable link to the original.
 - `size`: the original's pixel size; lets a single photo be laid out before it loads.
+- More EXIF facts (0.4.3): camera, lens, exposure settings, location, format, bytes; see docs/spec.md → Photos.
 - `path`: where the original was found (folder and file name). A hint: it breaks if the photo is moved or renamed.
   **A missing original is acceptable**: nothing depends on it; the viewer, save and share fall back to the copy.
 - All optional, `path` last (album names can contain spaces). A bare `![](media/<key>.webp)` is valid.
@@ -73,8 +74,8 @@ A photo is a line of its own, with a blank line around it:
   5+ = rows of three. A line of text between photos starts a new group.
 - List: text (3 lines) plus up to four thumbnails, "+N" for the rest.
 - **Viewer** shows the synced copy. 打开: open the original with another app (Android's open-with list; when found).
-  保存: original found → "已在相册", nothing saved; else save the copy to a LifeLog album as JPEG with the capture time
-  written back. 分享: the original when found, else the copy.
+  保存: original found → "已在相册", nothing saved; else save the copy (WebP as is, dated by the capture time) to the
+  LifeLog album. 分享: the original when found, else the copy.
 
 ## To check on a real phone
 

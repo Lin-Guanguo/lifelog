@@ -11,6 +11,7 @@ interface NativePhoto {
   width?: number
   height?: number
   path?: string
+  meta?: Record<string, string>
   uri?: string
 }
 
@@ -25,9 +26,10 @@ interface PhotosPlugin {
   remove(options: { name: string }): Promise<void>
   dir(): Promise<{ path: string }>
   hasOriginal(options: { uri: string; file: string }): Promise<{ value: boolean }>
+  inAlbum(options: { name: string; original?: string }): Promise<{ original?: string; saved?: string }>
   openOriginal(options: { uri: string }): Promise<void>
   share(options: { name: string; uri?: string }): Promise<void>
-  saveCopy(options: { name: string; taken?: string }): Promise<void>
+  saveCopy(options: { name: string; taken?: string }): Promise<{ existed: boolean; uri?: string }>
 }
 
 const Photos = registerPlugin<PhotosPlugin>('Photos')
@@ -82,6 +84,11 @@ export const nativePlatform: PhotoPlatform = {
     void Photos.addListener('shared', listener)
   },
   hasOriginal: async (uri, file) => (await Photos.hasOriginal({ uri, file })).value,
+  // A camera photo's original is in the LifeLog folder under the name its photo line records.
+  inAlbum: (photo, findOriginal) => Photos.inAlbum({
+    name: photo.file,
+    original: findOriginal ? photo.path?.match(/^Pictures\/LifeLog\/([^/]+)$/)?.[1] : undefined,
+  }),
   openOriginal: (uri) => Photos.openOriginal({ uri }),
   share: (name, uri) => Photos.share({ name, uri }),
   saveCopy: (photo) => Photos.saveCopy({ name: photo.file, taken: photo.taken }),

@@ -5,12 +5,13 @@ import { showNotice } from '../compose'
 import { dateOf, timeOf } from '../format'
 import { t } from '../i18n'
 import { takenAt, type PhotoRef } from '../media/content'
-import { findOriginal, platform } from '../media/photos'
+import { photoStatus, platform, saveCopy, type PhotoStatus } from '../media/photos'
 import AppIcon from './AppIcon.vue'
 import MediaImage from './MediaImage.vue'
 
-// Full screen, the synced copy. The original is used when it is still on this device:
-// open it with another app (Android's "open with" list), share it, and no need to save the copy.
+// Full screen, the synced copy. What the gallery holds is used when there is one: the original if it is still on
+// this device, else the copy saved to LifeLog's folder. Open it with another app (Android's "open with" list) and
+// share it; saving again is not needed.
 const props = defineProps<{ photos: PhotoRef[]; start: number }>()
 const emit = defineEmits<{ close: [] }>()
 useBackHandler(() => emit('close'))
@@ -18,15 +19,17 @@ useBackHandler(() => emit('close'))
 const track = ref<HTMLElement>()
 const index = ref(props.start)
 const photo = computed(() => props.photos[index.value])
-const originals = reactive(new Map<string, string | null>())
-const saved = reactive(new Set<string>())
-const original = computed(() => originals.get(photo.value.file) ?? null)
+const statuses = reactive(new Map<string, PhotoStatus>())
+const status = computed(() => statuses.get(photo.value.file))
+const original = computed(() => status.value?.original ?? null)
+const inGallery = computed(() => !!status.value?.inGallery)
+const galleryFile = computed(() => original.value ?? status.value?.saved ?? null)
 const taken = computed(() => takenAt(photo.value))
 const originalName = computed(() => photo.value.path?.split('/').pop())
 
 watch(photo, async (p) => {
-  if (!originals.has(p.file)) originals.set(p.file, await findOriginal(p.file))
-}, { immediate: true })
+  if (!statuses.has(p.file)) statuses.set(p.file, await photoStatus(p))
+}, { immediate: true }) // once per photo while the viewer is open
 
 onMounted(async () => {
   await nextTick()
@@ -46,13 +49,13 @@ async function act(action: () => Promise<void>) {
   }
 }
 
-const openOriginal = () => act(() => platform.openOriginal(original.value!))
-const share = () => act(() => platform.share(photo.value.file, original.value ?? undefined))
+const openOriginal = () => act(() => platform.openOriginal(galleryFile.value!))
+const share = () => act(() => platform.share(photo.value.file, galleryFile.value ?? undefined))
 const save = () => act(async () => {
   const p = photo.value
-  await platform.saveCopy(p)
-  saved.add(p.file)
-  showNotice(t('viewer.savedNotice'))
+  const { result, status: next } = await saveCopy(p, statuses.get(p.file) ?? { original: null, saved: null, inGallery: false })
+  statuses.set(p.file, next)
+  showNotice(t(result === 'existed' ? 'viewer.alreadySaved' : 'viewer.savedNotice'))
 })
 </script>
 
@@ -69,14 +72,15 @@ const save = () => act(async () => {
       <div class="foot">
         <div class="caption">
           <b v-if="taken !== null">{{ dateOf(taken) }} {{ timeOf(taken) }}</b>
-          <small>{{ original ? (originalName ? t('viewer.original', { name: originalName }) : t('viewer.originalNoName')) : t('viewer.copy') }}</small>
+          <small>{{ original ? (originalName ? t('viewer.original', { name: originalName }) : t('viewer.originalNoName'))
+            : status?.saved ? t('viewer.copyInGallery') : t('viewer.copy') }}</small>
         </div>
-        <button v-if="original" class="action" type="button" :aria-label="t('viewer.openWith')" @click="openOriginal">
+        <button v-if="galleryFile" class="action" type="button" :aria-label="t('viewer.openWith')" @click="openOriginal">
           <AppIcon name="open" /><small>{{ t('viewer.open') }}</small>
         </button>
-        <button class="action" type="button" :aria-label="t('viewer.saveLabel')" :disabled="!!original || saved.has(photo.file)" @click="save">
-          <AppIcon :name="original || saved.has(photo.file) ? 'check' : 'download'" />
-          <small>{{ original ? t('viewer.inGallery') : saved.has(photo.file) ? t('viewer.saved') : t('viewer.save') }}</small>
+        <button class="action" type="button" :aria-label="t('viewer.saveLabel')" :disabled="inGallery" @click="save">
+          <AppIcon :name="inGallery ? 'check' : 'download'" />
+          <small>{{ inGallery ? t('viewer.inGallery') : t('viewer.save') }}</small>
         </button>
         <button class="action" type="button" :aria-label="t('viewer.share')" @click="share">
           <AppIcon name="share" /><small>{{ t('viewer.share') }}</small>

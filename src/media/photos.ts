@@ -67,11 +67,27 @@ export function photoUrl(file: string): Promise<string | null> {
   return url
 }
 
-// The original's location when it is still on this device, unchanged.
-const found = new Map<string, Promise<string | null>>()
-export function findOriginal(file: string): Promise<string | null> {
-  const origin = origins[file]
-  if (!origin) return Promise.resolve(null)
-  if (!found.has(file)) found.set(file, platform.hasOriginal(origin, file).then((ok) => (ok ? origin : null), () => null))
-  return found.get(file)!
+export interface PhotoStatus {
+  original: string | null // where the original is on this device, unchanged
+  saved: string | null // the copy saved to the gallery's LifeLog folder (Android)
+  inGallery: boolean // the original or a saved copy is in the gallery
+}
+
+// Looked up each time the viewer shows a photo, so photos deleted from the gallery meanwhile are noticed.
+export async function photoStatus(photo: PhotoRef): Promise<PhotoStatus> {
+  const origin = origins[photo.file]
+  let original = origin && await platform.hasOriginal(origin, photo.file).catch(() => false) ? origin : null
+  // The album lookup hashes a camera original; not needed when the remembered link already found it.
+  const album: { original?: string; saved?: string } = await platform.inAlbum(photo, !original).catch(() => ({}))
+  if (!original && album.original) {
+    original = album.original
+    origins[photo.file] = original // found again (e.g. after app data was cleared): remember it
+    await Preferences.set({ key: ORIGINS_KEY, value: JSON.stringify(origins) })
+  }
+  return { original, saved: album.saved ?? null, inGallery: !!original || !!album.saved }
+}
+
+export async function saveCopy(photo: PhotoRef, status: PhotoStatus): Promise<{ result: 'saved' | 'existed'; status: PhotoStatus }> {
+  const saved = await platform.saveCopy(photo)
+  return { result: saved.existed ? 'existed' : 'saved', status: { ...status, saved: saved.uri ?? status.saved, inGallery: true } }
 }

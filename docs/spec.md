@@ -66,9 +66,15 @@ An entry's text may contain photo lines; nothing else about photos is stored (no
 - `<key>`: the first 32 hex digits of the SHA-256 of the **original** file, so the same photo gets the same key on
   every device. The line points at LifeLog's **compressed copy** (long side 1600 px, WebP quality 0.8; JPEG where the
   WebView cannot encode WebP), which has no EXIF (no location). Copies never change once written.
-- Title fields, all optional hints about the original: `taken` (capture time from EXIF, with offset; else the
-  gallery's date taken), `size` (pixels), `path` (folder/name where it was found; may be gone, which is fine).
-  `"` and `\` are escaped; `path` comes last.
+- Title fields, all optional facts about the original, as space-separated `name=value` tokens (spaces and `%` in
+  values written as `%20`, `%25`; `"` and `\` escaped; unknown fields kept): `taken` (capture time from EXIF, with
+  offset; else the gallery's date taken), `size` (pixels), then from EXIF when present: `make`, `model`, `lensmake`,
+  `lens`, `focal` (mm), `focal35`, `f`, `exposure` (s or 1/n), `iso`, `ev`, `flash` (0/1), `wb` (auto/manual),
+  `program`, `metering`, `zoom`, `scene` (EXIF codes), `gps` (lat,lon), `alt` (m), `dir` (compass °), `speed`
+  (value + K/M/N), `software`; `format` and `bytes` of the original; last and as is, `path` (folder/name relative to
+  shared storage, e.g. `Pictures/LifeLog/IMG_….jpg`; may be gone, which is fine). Location is private data kept in
+  the text on purpose (personal app). Android removes it from gallery files for apps without location access, so it
+  may be missing for photos from the picker or Share; camera photos are read from the camera's own file.
 - A photo is a line of its own with a blank line around it; any other line is plain text (no Markdown rendering).
   Lists and search use the text without photo lines.
 - The original stays in the system gallery; LifeLog never moves, uploads or deletes it. Where it was found is
@@ -137,8 +143,11 @@ WebView's `fetch` is subject to CORS and Capacitor's HTTP plugin cannot send Web
   cursor; long-press a photo to move it (the entry shrinks to an overview, the bottom bar becomes a remove zone).
   Explicit Save; leaving with changes (back arrow or Android back) asks Save / Discard / Keep editing. Unchanged text saves nothing.
 - **Photo viewer** (tap a photo in the sheet): the synced copy, full screen, swipe between photos; open the original with
-  another app (Android's open-with list; when still on this device), save the copy to the gallery (JPEG with the capture time; "already in
-  gallery" when the original is there), share (the original, else the copy).
+  another app (Android's open-with list; when still on this device), save the copy to the gallery's LifeLog folder (the WebP as is, named
+  `LifeLog_<key>.webp`, dated by the capture time; "already in gallery" when the original or that saved copy is there, looked up in
+  the LifeLog folder, so nothing is recorded in the text), share (the original, else the saved copy, else the synced copy). 打开 (open) appears when the original or a saved
+  copy is in the gallery. A camera original
+  in the LifeLog folder is found by the file name its photo line records and checked by hash.
 - **Search**: highlighted matches grouped by day; tap opens the sheet.
 - **Settings**: language (system / 中文 / English); trash auto-clear period (presets + custom dialog) and trash entry; photo copies (count, size); WebDAV sync (connection, status, sync now, interval); about (check for updates, author pop-up). The main header shows a sync status chip.
 - **Trash**: search box; cards grouped by entry (current text shown for reference); rows show original/saved time and days left; select rows or whole entries; restore or delete forever.
