@@ -14,7 +14,8 @@ commands
   search <text>          entries containing <text> (case-insensitive for ASCII)
   sql "<query>"          run SQL against the local file; changes are never saved
   photos                 photo files on the server (<directory>/media/) against the photos entries reference
-                         in the local file (pull first): referenced, missing on the server, not referenced
+                         in the local file (pull first): referenced, missing on the server, not referenced, and
+                         files whose size differs from the bytes their photo line records
 
 options
   --db <path>            local SQLite file to read, or to write with pull (default .data/lifelog.sqlite)
@@ -75,17 +76,32 @@ async function photos() {
   const rows = query(db, `SELECT content, deleted_at FROM records WHERE ${hasPurged ? 'purged_at IS NULL' : '1'} AND content LIKE '%](media/%'`)
   const live = new Set()
   const trash = new Set()
-  for (const r of rows) for (const [, file] of String(r.content).matchAll(PHOTO)) (r.deleted_at === null ? live : trash).add(file)
+  const recorded = new Map() // file → bytes its photo line records (0.4.4+)
+  for (const r of rows) {
+    for (const [line, file] of String(r.content).matchAll(PHOTO)) {
+      ;(r.deleted_at === null ? live : trash).add(file)
+      const bytes = / bytes=(\d+)/.exec(line)?.[1]
+      if (bytes) recorded.set(file, Number(bytes))
+    }
+  }
 
   const { url, auth, directory } = webdav()
   const folder = url + [...directory.split('/').filter(Boolean), 'media'].map(encodeURIComponent).join('/') + '/'
   const res = await fetch(folder, { method: 'PROPFIND', headers: { Authorization: auth, Depth: '1' } })
   if (res.status === 401 || res.status === 403) throw new Error(`authentication failed (HTTP ${res.status})`)
   if (res.status !== 207 && res.status !== 404) throw new Error(`PROPFIND ${folder} → HTTP ${res.status}`)
-  const remote = res.status === 404 ? [] : [...(await res.text()).matchAll(/<(?:[\w-]+:)?href>([^<]*)<\/(?:[\w-]+:)?href>/gi)]
-    .map((m) => decodeURIComponent(m[1].replace(/\/+$/, '').split('/').pop() ?? ''))
-    .filter((name) => new RegExp(`^[0-9a-f]{32}\\.(${EXT})$`).test(name))
-  const onServer = new Set(remote)
+  // name → size in bytes, from each <response> of the listing
+  const sizes = new Map()
+  if (res.status !== 404) {
+    for (const [response] of (await res.text()).matchAll(/<(?:[\w-]+:)?response[\s>][\s\S]*?<\/(?:[\w-]+:)?response>/gi)) {
+      const href = /<(?:[\w-]+:)?href>([^<]*)</i.exec(response)?.[1] ?? ''
+      const name = decodeURIComponent(href.replace(/\/+$/, '').split('/').pop() ?? '')
+      if (new RegExp(`^[0-9a-f]{32}\\.(${EXT})$`).test(name)) {
+        sizes.set(name, Number(/<(?:[\w-]+:)?getcontentlength>(\d+)</i.exec(response)?.[1] ?? NaN))
+      }
+    }
+  }
+  const onServer = new Set(sizes.keys())
   const referenced = new Set([...live, ...trash])
   const result = {
     folder,
@@ -94,11 +110,16 @@ async function photos() {
     referencedOnlyByTrash: [...trash].filter((f) => !live.has(f)).length,
     missingOnServer: [...referenced].filter((f) => !onServer.has(f)),
     notReferenced: [...onServer].filter((f) => !referenced.has(f)),
+    sizeDiffers: [...recorded].filter(([f, n]) => sizes.has(f) && sizes.get(f) !== n).map(([f, n]) => ({ file: f, recorded: n, onServer: sizes.get(f) })),
+    sizes: Object.fromEntries(sizes),
   }
   print(result, () => `${folder}\n${result.onServer} on the server; entries reference ${result.referencedByEntries}`
     + ` (+${result.referencedOnlyByTrash} only from the trash)\nmissing on the server: ${result.missingOnServer.length}`
     + `${result.missingOnServer.map((f) => `\n  ${f}`).join('')}\nnot referenced: ${result.notReferenced.length}`
-    + `${result.notReferenced.map((f) => `\n  ${f}`).join('')}`)
+    + `${result.notReferenced.map((f) => `\n  ${f}`).join('')}`
+    + `\nsize differs from the photo line: ${result.sizeDiffers.length}`
+    + `${result.sizeDiffers.map((d) => `\n  ${d.file}: line ${d.recorded}, server ${d.onServer}`).join('')}`
+    + [...sizes].map(([f, n]) => `\n  ${f}  ${n} bytes`).join(''))
 }
 
 async function pull() {
