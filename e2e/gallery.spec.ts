@@ -60,7 +60,8 @@ async function capture(browser: Browser, theme: Theme) {
   })
 
   flow('Record', 'The main log is a chat-style stream: oldest at the top, newest above the composer, grouped by day. '
-    + 'Type (or dictate with the keyboard) and send; the time is taken when sent. Long entries are clamped to three lines.')
+    + 'Type (or dictate with the keyboard) and send; the time is taken when sent. Long entries are clamped to three lines. '
+    + 'Entries from the last hour show seconds on a small line under the time (the column keeps its width).')
   await shot('Empty log', 'First launch.')
   await send('开始练胸')
   await at('2026-11-08T19:42:00')

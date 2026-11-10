@@ -122,6 +122,7 @@ WebView's `fetch` is subject to CORS and Capacitor's HTTP plugin cannot send Web
 ## Screens
 
 - **Main**: chat-style stream, oldest at top, newest at the bottom above the composer; grouped by day; long text clamped to 3 lines.
+  Entries from the last hour show seconds on a small line under HH:MM, so the time column keeps its width.
   - Tap: half-screen sheet with the full text and three icons stacked bottom-right (full screen, edit, delete with
     confirmation). Full screen expands the same sheet in place, keeping the icons; the first icon or back collapses it.
     Dragging the handle up expands, down collapses or closes.

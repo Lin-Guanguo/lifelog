@@ -8,6 +8,7 @@ update dialog.
 - Camera photos were lost on some phones: the camera app saved nothing and the photo vanished. The camera now
   writes into LifeLog, which adds the photo to the gallery (Pictures/LifeLog) itself; if a camera app still returns
   nothing, a message says so.
+- Entries from the last hour show seconds, under the time.
 
 ## 0.4.0
 

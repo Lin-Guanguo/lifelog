@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { pushBackHandler } from '../back'
 import { chooseTime, clearDraft, draft, importPhotos, isOld, offerPhotoTimes } from '../compose'
 import type { LogRecord } from '../data/records'
-import { groupByDay, logTime, timeOf } from '../format'
+import { groupByDay, logTime, secondsOf, timeOf } from '../format'
 import { t } from '../i18n'
 import { composeContent, photosOf, takenAt, textOf } from '../media/content'
 import type { PhotoSource } from '../media/photos'
@@ -130,6 +130,15 @@ function openLayout() {
   openScreen({ name: 'compose' })
 }
 
+// Entries from the last hour also show seconds; re-checked every half minute so they drop off on time.
+const RECENT_MS = 3_600_000
+const now = ref(Date.now())
+const recent = (ms: number) => now.value - ms < RECENT_MS
+let clock: number | undefined
+onMounted(() => { clock = window.setInterval(() => { now.value = Date.now() }, 30_000) })
+onUnmounted(() => window.clearInterval(clock))
+watch(liveRecords, () => { now.value = Date.now() })
+
 onMounted(scrollToBottom)
 </script>
 
@@ -166,7 +175,7 @@ onMounted(scrollToBottom)
           @pointercancel="cancelPress" @pointerleave="cancelPress" @contextmenu.prevent
           @click="onClick(record)" @keydown.enter="onClick(record)">
           <input v-if="selecting" type="checkbox" tabindex="-1" :checked="selected.has(record.entry_id)" aria-hidden="true">
-          <time>{{ timeOf(record.logged_at) }}</time>
+          <time>{{ timeOf(record.logged_at) }}<small v-if="recent(record.logged_at)" class="sec">:{{ secondsOf(record.logged_at) }}</small></time>
           <div class="body">
             <p v-if="textOf(record.content)" class="text">{{ textOf(record.content) }}</p>
             <PhotoStrip v-if="photosOf(record.content).length" :photos="photosOf(record.content)" />

@@ -28,7 +28,9 @@ test('v1 acceptance flow', async ({ page }) => {
   await send(page, '卧推，60 公斤，10 次')
   await send(page, '同样重量，8 词')
   await expect(page.locator('main .daypill')).toHaveText(/^今天 · /)
-  await expect(page.locator('main .entry time').first()).toHaveText(/^\d{2}:\d{2}$/)
+  // Entries from the last hour show seconds, on a line of their own under HH:MM
+  await expect(page.locator('main .entry time').first()).toHaveText(/^\d{2}:\d{2}:\d{2}$/)
+  await expect(page.locator('main .entry time .sec').first()).toHaveText(/^:\d{2}$/)
   await expect(page.getByRole('textbox', { name: '新记录' })).toHaveValue('')
 
   // Long text is clamped in the list

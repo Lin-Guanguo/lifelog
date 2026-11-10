@@ -7,6 +7,10 @@ export function timeOf(ms: number): string {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
+export function secondsOf(ms: number): string {
+  return pad(new Date(ms).getSeconds())
+}
+
 export function dayKey(ms: number): string {
   const d = new Date(ms)
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`

@@ -39,7 +39,13 @@ test('photos: add, choose the time, lay out, view, sync', async ({ page, browser
 
   // Logged at the photo's time, with both thumbnails.
   const entry = page.locator('.stream .entry', { hasText: '湖边走了一圈' })
-  await expect(entry.locator('time')).toHaveText(hm(older))
+  await expect(entry.locator('time')).toHaveText(hm(older)) // hours ago: no seconds
+  // A recent entry shows seconds without widening the time column.
+  await page.getByRole('textbox', { name: '新记录' }).fill('刚刚')
+  await page.getByRole('button', { name: '发送' }).click()
+  const fresh = page.locator('.stream .entry', { hasText: '刚刚' }).locator('time')
+  await expect(fresh.locator('.sec')).toHaveText(/^:\d{2}$/)
+  expect((await fresh.boundingBox())!.width).toBe((await entry.locator('time').boundingBox())!.width)
   await expect(entry.locator('.strip .thumb img')).toHaveCount(2)
 
   // Search matches the words, not the photo lines (file name, path, time).

@@ -52,6 +52,8 @@ button:disabled { opacity: .45; cursor: default; }
   user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
 }
 .entry time { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 40px; flex-shrink: 0; }
+/* Seconds (entries from the last hour) go on a small line under HH:MM, so the time column keeps its width. */
+.entry time .sec { display: block; font-size: 10px; line-height: 1.2; opacity: .8; }
 .entry .text { margin: 0; font-size: 16px; line-height: 1.45; flex-grow: 1; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere;
   display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .entry.selected { background: var(--accent-soft); }
