@@ -10,7 +10,7 @@ import AppIcon from './AppIcon.vue'
 import MediaImage from './MediaImage.vue'
 
 // Full screen, the synced copy. The original is used when it is still on this device:
-// open it in the gallery, share it, and no need to save the copy.
+// open it with another app (Android's "open with" list), share it, and no need to save the copy.
 const props = defineProps<{ photos: PhotoRef[]; start: number }>()
 const emit = defineEmits<{ close: [] }>()
 useBackHandler(() => emit('close'))
@@ -71,8 +71,8 @@ const save = () => act(async () => {
           <b v-if="taken !== null">{{ dateOf(taken) }} {{ timeOf(taken) }}</b>
           <small>{{ original ? (originalName ? t('viewer.original', { name: originalName }) : t('viewer.originalNoName')) : t('viewer.copy') }}</small>
         </div>
-        <button v-if="original" class="action" type="button" :aria-label="t('viewer.openGallery')" @click="openOriginal">
-          <AppIcon name="image" /><small>{{ t('viewer.gallery') }}</small>
+        <button v-if="original" class="action" type="button" :aria-label="t('viewer.openWith')" @click="openOriginal">
+          <AppIcon name="open" /><small>{{ t('viewer.open') }}</small>
         </button>
         <button class="action" type="button" :aria-label="t('viewer.saveLabel')" :disabled="!!original || saved.has(photo.file)" @click="save">
           <AppIcon :name="original || saved.has(photo.file) ? 'check' : 'download'" />

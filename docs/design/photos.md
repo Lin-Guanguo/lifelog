@@ -72,7 +72,7 @@ A photo is a line of its own, with a blank line around it:
   (cropped to 3:4 … 2:1); 2 = two squares (80% wide); 3 = a row of three; 4 = 2×2 at the three-across size;
   5+ = rows of three. A line of text between photos starts a new group.
 - List: text (3 lines) plus up to four thumbnails, "+N" for the rest.
-- **Viewer** shows the synced copy. 相册: open the original in the gallery (when found; not possible on iOS).
+- **Viewer** shows the synced copy. 打开: open the original with another app (Android's open-with list; when found).
   保存: original found → "已在相册", nothing saved; else save the copy to a LifeLog album as JPEG with the capture time
   written back. 分享: the original when found, else the copy.
 

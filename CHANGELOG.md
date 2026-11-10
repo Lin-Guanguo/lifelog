@@ -3,6 +3,10 @@
 Each release's notes come from its section here (the release workflow requires one) and are shown in the app's
 update dialog.
 
+## 0.4.2
+
+- Photo viewer: the button that opens the original is now called 打开 (open with another app), which is what it does.
+
 ## 0.4.1
 
 - Camera photos were lost on some phones: the camera app saved nothing and the photo vanished. The camera now

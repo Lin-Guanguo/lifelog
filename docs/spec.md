@@ -136,8 +136,8 @@ WebView's `fetch` is subject to CORS and Capacitor's HTTP plugin cannot send Web
 - **Edit** (and **New entry**, from 排版): text fields and photo thumbnails, no formatting; camera / gallery insert at the
   cursor; long-press a photo to move it (the entry shrinks to an overview, the bottom bar becomes a remove zone).
   Explicit Save; leaving with changes (back arrow or Android back) asks Save / Discard / Keep editing. Unchanged text saves nothing.
-- **Photo viewer** (tap a photo in the sheet): the synced copy, full screen, swipe between photos; open the original in
-  the gallery (when still on this device), save the copy to the gallery (JPEG with the capture time; "already in
+- **Photo viewer** (tap a photo in the sheet): the synced copy, full screen, swipe between photos; open the original with
+  another app (Android's open-with list; when still on this device), save the copy to the gallery (JPEG with the capture time; "already in
   gallery" when the original is there), share (the original, else the copy).
 - **Search**: highlighted matches grouped by day; tap opens the sheet.
 - **Settings**: language (system / 中文 / English); trash auto-clear period (presets + custom dialog) and trash entry; photo copies (count, size); WebDAV sync (connection, status, sync now, interval); about (check for updates, author pop-up). The main header shows a sync status chip.

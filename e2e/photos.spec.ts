@@ -64,7 +64,7 @@ test('photos: add, choose the time, lay out, view, sync', async ({ page, browser
   const viewer = page.getByRole('dialog', { name: '查看照片' })
   await expect(viewer).toContainText('2 / 2')
   await expect(viewer).toContainText('同步副本')
-  await expect(viewer.getByRole('button', { name: '在相册中打开原图' })).toHaveCount(0)
+  await expect(viewer.getByRole('button', { name: '用其他应用打开原图' })).toHaveCount(0)
   const download = page.waitForEvent('download')
   await viewer.getByRole('button', { name: '保存到相册' }).click()
   expect((await download).suggestedFilename()).toMatch(/^[0-9a-f]{32}\.webp$/)

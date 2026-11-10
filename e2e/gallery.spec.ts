@@ -132,7 +132,7 @@ async function capture(browser: Browser, theme: Theme) {
   await shot('Sheet', 'Text, then the photos as one group: 1 keeps its shape (≤160 px tall), 2 side by side, '
     + '3 in a row, 4 as 2×2, 5+ in rows of three.')
   await sheet.locator('.tile').first().click()
-  await shot('Viewer', 'The synced copy. 相册 opens the original when it is still on the phone; 保存 saves the copy '
+  await shot('Viewer', 'The synced copy. 打开 opens the original with another app (Android’s open-with list) when it is still on the phone; 保存 saves the copy '
     + '(or shows 已在相册); 分享 shares the original, else the copy.')
   await page.getByRole('button', { name: '关闭' }).click()
   await sheet.getByRole('button', { name: '编辑' }).click()
