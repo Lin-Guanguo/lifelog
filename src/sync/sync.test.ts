@@ -166,9 +166,12 @@ describe('sync', () => {
 
     // Another device sees the entry and fetches a copy when it shows it.
     const laptop = await device()
-    await sync(createWebDav(CONFIG, transport()), laptop, {}, false, undefined, 3000, memoryFiles({}))
+    const laptopFiles = memoryFiles({})
+    await sync(createWebDav(CONFIG, transport()), laptop, {}, false, undefined, 3000, laptopFiles)
     expect((await laptop.listTrash()).trashed).toHaveLength(1)
-    expect([...await downloadPhoto(dav, photo('b'))]).toEqual([2])
+    expect(await downloadPhoto(dav, laptopFiles, photo('b'))).toBe(true)
+    expect([...await laptopFiles.read(photo('b'))]).toEqual([2])
+    expect(await downloadPhoto(dav, laptopFiles, photo('z'))).toBe(false) // not on the server
     expect(state.remoteVersion).toBeDefined()
   })
 
@@ -198,6 +201,21 @@ describe('sync', () => {
     expect([...server.files.keys()].filter((k) => k.includes('/media/'))).toHaveLength(uploaded) // server untouched
   })
 
+  it('keeps a photo added again just before it would be removed', async () => {
+    const day = 24 * 3_600_000
+    const now = Date.UTC(2026, 10, 12)
+    const files = memoryFiles({ [`${'e'.repeat(32)}.jpg`]: [5] }, now - 2 * day)
+    const list = files.list
+    // Between listing and removing, the photo is added again (its date refreshed).
+    files.list = async () => {
+      const snapshot = await list()
+      files.add(`${'e'.repeat(32)}.jpg`, now)
+      return snapshot
+    }
+    await sync(createWebDav(CONFIG, transport()), await device(), {}, true, undefined, now, files)
+    expect(files.names()).toEqual([`${'e'.repeat(32)}.jpg`])
+  })
+
   it('without photos it makes no extra requests', async () => {
     const phone = await device()
     await phone.add('text only')
@@ -225,8 +243,9 @@ function memoryFiles(initial: Record<string, number[]>, modified = 0): MediaFile
     list: async () => [...files].map(([name, f]) => ({ name, modified: f.modified })),
     read: async (name) => files.get(name)!.bytes,
     write: async (name, bytes) => { files.set(name, { bytes, modified: Date.now() }) },
-    remove: async (name) => { files.delete(name) },
-    url: async (name) => (files.has(name) ? `memory:${name}` : null),
+    remove: async (name, keepSince) => {
+      if (keepSince === undefined || files.get(name)!.modified < keepSince) files.delete(name)
+    },
     names: () => [...files.keys()].sort(),
     add: (name, at) => { files.set(name, { bytes: new Uint8Array([0]), modified: at }) },
   }

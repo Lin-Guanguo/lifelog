@@ -13,7 +13,7 @@ commands
   list                   entries in time order (default: the latest 50)
   search <text>          entries containing <text> (case-insensitive for ASCII)
   sql "<query>"          run SQL against the local file; changes are never saved
-  photos                 photo copies on the server (<directory>/media/) against the photos entries reference
+  photos                 photo files on the server (<directory>/media/) against the photos entries reference
                          in the local file (pull first): referenced, missing on the server, not referenced
 
 options
@@ -65,8 +65,9 @@ function webdav() {
   }
 }
 
-// Photo lines in entry text: ![](media/<key>.webp "…") (docs/spec.md → Photos).
-const PHOTO = /^!\[[^\]]*\]\(media\/([0-9a-f]{32}\.(?:webp|jpg))(?: "(?:[^"\\]|\\.)*")?\)$/gm
+// Photo lines in entry text: ![](media/<key>.<ext> "…") (docs/spec.md → Photos).
+const EXT = 'jpg|png|webp|heic|avif|gif'
+const PHOTO = new RegExp(`^!\\[[^\\]]*\\]\\(media\\/([0-9a-f]{32}\\.(?:${EXT}))(?: "(?:[^"\\\\]|\\\\.)*")?\\)$`, 'gm')
 
 async function photos() {
   const db = await open()
@@ -83,7 +84,7 @@ async function photos() {
   if (res.status !== 207 && res.status !== 404) throw new Error(`PROPFIND ${folder} → HTTP ${res.status}`)
   const remote = res.status === 404 ? [] : [...(await res.text()).matchAll(/<(?:[\w-]+:)?href>([^<]*)<\/(?:[\w-]+:)?href>/gi)]
     .map((m) => decodeURIComponent(m[1].replace(/\/+$/, '').split('/').pop() ?? ''))
-    .filter((name) => /^[0-9a-f]{32}\.(webp|jpg)$/.test(name))
+    .filter((name) => new RegExp(`^[0-9a-f]{32}\\.(${EXT})$`).test(name))
   const onServer = new Set(remote)
   const referenced = new Set([...live, ...trash])
   const result = {

@@ -3,6 +3,17 @@
 Each release's notes come from its section here (the release workflow requires one) and are shown in the app's
 update dialog.
 
+## 0.4.4
+
+- LifeLog keeps each photo's **original**, byte for byte, instead of a compressed copy: inside the app only (the
+  system gallery never shows it, so nothing is duplicated) and synced to `media/` on WebDAV. Photos already in your
+  log keep their copies and work as before.
+- 🖼 opens the system document picker, which hands over the photos themselves with their EXIF (some phones' photo
+  pickers hand over stripped copies). Camera photos are kept the same way and no longer added to the gallery.
+- Photo lines no longer record where a photo came from (no path); only facts about it.
+- Viewer: 打开 opens the photo with another app, 分享 shares the original, 保存 exports it to the gallery's LifeLog
+  album once. The caption shows the format and size.
+
 ## 0.4.3
 
 - Photo viewer: saving a photo that is already in the gallery's LifeLog folder (saved before, or the camera original)

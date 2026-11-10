@@ -190,12 +190,9 @@ export default {
 
   'viewer.label': 'Photo',
   'viewer.counter': '{i} / {n}',
-  'viewer.original': 'Original in gallery · {name}',
-  'viewer.originalNoName': 'Original in gallery',
-  'viewer.copy': 'Synced copy',
-  'viewer.copyInGallery': 'Copy in the gallery · LifeLog',
+  'viewer.inGalleryNote': 'In the gallery · LifeLog',
   'viewer.open': 'Open',
-  'viewer.openWith': 'Open the original with another app',
+  'viewer.openWith': 'Open with another app',
   'viewer.save': 'Save',
   'viewer.saveLabel': 'Save to gallery',
   'viewer.inGallery': 'In gallery',
@@ -203,9 +200,10 @@ export default {
   'viewer.savedNotice': 'Saved to the gallery · LifeLog',
   'viewer.share': 'Share',
   'viewer.failed': 'Did not work: {error}',
+  'viewer.unavailable': 'This photo has not reached this device yet',
 
   'settings.photosSection': 'Photos',
-  'settings.photosUsage': 'Photo copies',
+  'settings.photosUsage': 'Photos',
   'settings.photosValue': '{n} · {size}',
-  'settings.photosHint': 'Photos in entries are kept as compressed copies (1600 px long side); the originals stay in the system gallery. Each sync deletes copies on this device that no entry uses any more (the server keeps its copies).',
+  'settings.photosHint': 'Photos in entries are kept as their originals, inside LifeLog only (not in the system gallery), and backed up by sync. Each sync deletes photos on this device that no entry uses any more.',
 } satisfies Messages

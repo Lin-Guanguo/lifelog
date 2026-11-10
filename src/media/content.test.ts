@@ -41,7 +41,8 @@ describe('photo lines', () => {
   })
 
   it('leave anything else as text', () => {
-    for (const line of ['![](media/abc.webp)', `![](media/${KEY}.png)`, `![](../media/${KEY}.webp)`, `text ![](media/${KEY}.webp)`,
+    for (const ext of ['jpg', 'png', 'heic']) expect(parsePhotoLine(`![](media/${KEY}.${ext})`)).toEqual({ file: `${KEY}.${ext}` })
+    for (const line of ['![](media/abc.webp)', `![](media/${KEY}.exe)`, `![](../media/${KEY}.webp)`, `text ![](media/${KEY}.webp)`,
       `![](media/${KEY}.webp "unterminated)`]) {
       expect(parsePhotoLine(line)).toBeNull()
     }

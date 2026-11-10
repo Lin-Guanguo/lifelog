@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import type { PhotoRef } from '../media/content'
-import { photoUrl } from '../media/photos'
+import { forgetPhotoUrl, photoUrl } from '../media/photos'
 import { t } from '../i18n'
 import AppIcon from './AppIcon.vue'
 
@@ -22,11 +22,27 @@ async function load() {
   }
 }
 
+// A URL that stopped working (its preview was cleared from the cache): look it up again, once.
+let retried = false
+function onError() {
+  if (retried) {
+    src.value = null
+    state.value = 'missing'
+    return
+  }
+  retried = true
+  forgetPhotoUrl(props.photo.file)
+  src.value = null
+  state.value = 'idle'
+  void load()
+}
+
 // Reused for another photo (lists re-render in place): start over.
 watch(() => props.photo.file, () => {
   const wasLoaded = state.value !== 'idle'
   src.value = null
   state.value = 'idle'
+  retried = false
   if (wasLoaded) void load()
 })
 
@@ -45,7 +61,7 @@ onUnmounted(() => observer?.disconnect())
 
 <template>
   <div ref="el" class="media" :class="state" :title="state === 'missing' ? t('photo.unavailable') : undefined">
-    <img v-if="src" :src="src" :alt="t('photo.alt')" :style="{ objectFit: fit ?? 'cover' }" draggable="false">
+    <img v-if="src" :src="src" :alt="t('photo.alt')" :style="{ objectFit: fit ?? 'cover' }" draggable="false" @error="onError">
     <AppIcon v-else-if="state === 'missing'" name="image" :size="20" />
   </div>
 </template>

@@ -2,7 +2,7 @@ import type { Records } from '../data/records'
 import { fromSqliteFile, toSqliteFile } from '../data/snapshot'
 import { photosOf } from '../media/content'
 import { contentType, type MediaFiles } from '../media/files'
-import type { WebDav } from './webdav'
+import { WebDavError, type WebDav } from './webdav'
 
 // The server keeps one standard SQLite snapshot of the log, and the photo copies in media/.
 export const REMOTE_FILE = 'lifelog.sqlite'
@@ -62,7 +62,8 @@ async function removeUnusedPhotos(photos: MediaFiles, inUse: Set<string>, now: n
   const here: string[] = []
   for (const file of await photos.list()) {
     if (inUse.has(file.name)) here.push(file.name)
-    else if (now - file.modified > PHOTO_GRACE_MS) await photos.remove(file.name)
+    // The file's date is checked again when removing: the photo may have been added again meanwhile.
+    else if (now - file.modified > PHOTO_GRACE_MS) await photos.remove(file.name, now - PHOTO_GRACE_MS)
   }
   return here
 }
@@ -78,11 +79,32 @@ async function uploadPhotos(dav: WebDav, here: string[], photos: MediaFiles): Pr
   }
   const there = new Set(remote.map((f) => f.name))
   for (const name of here) {
-    if (!there.has(name)) await dav.put(dav.fileUrl(name, MEDIA_FOLDER), await photos.read(name), contentType(name))
+    if (there.has(name)) continue
+    const url = dav.fileUrl(name, MEDIA_FOLDER)
+    if (!photos.upload) {
+      await dav.put(url, await photos.read(name), contentType(name))
+      continue
+    }
+    const status = await photos.upload(name, url, { ...dav.headers(), 'Content-Type': contentType(name) })
+    if (status === 401 || status === 403) throw new WebDavError(status, 'authentication failed')
+    if (status < 200 || status >= 300) throw new WebDavError(status, `PUT ${url} → HTTP ${status}`)
   }
 }
 
-// A photo copy another device uploaded, fetched when it is first shown here.
-export function downloadPhoto(dav: WebDav, name: string): Promise<Uint8Array> {
-  return dav.get(dav.fileUrl(name, MEDIA_FOLDER))
+// A photo another device uploaded, fetched into `photos` when it is first shown here; false when the server lacks it.
+export async function downloadPhoto(dav: WebDav, photos: MediaFiles, name: string): Promise<boolean> {
+  const url = dav.fileUrl(name, MEDIA_FOLDER)
+  if (!photos.download) {
+    const bytes = await dav.get(url).catch((error: unknown) => {
+      if (error instanceof WebDavError && error.status === 404) return null
+      throw error
+    })
+    if (bytes) await photos.write(name, bytes)
+    return !!bytes
+  }
+  const status = await photos.download(name, url, dav.headers())
+  if (status === 404) return false
+  if (status === 401 || status === 403) throw new WebDavError(status, 'authentication failed')
+  if (status !== 200) throw new WebDavError(status, `GET ${url} → HTTP ${status}`)
+  return true
 }

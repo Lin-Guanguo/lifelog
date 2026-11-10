@@ -1,9 +1,10 @@
 import { contentType, type MediaFiles } from './files'
+import type { PhotoRef } from './content'
 import { exifTaken, isoWithOffset } from './exif'
-import { LONG_SIDE, type ImportedPhoto, type PhotoPlatform } from './platform'
+import type { PhotoPlatform } from './platform'
 
-// Browser version (development, tests): copies in IndexedDB, files chosen with <input type=file>.
-// There is no gallery, so originals are never found again.
+// Browser version (development, tests): originals in IndexedDB, files chosen with <input type=file>; "export" and
+// "share" download the file.
 
 const DB = 'lifelog-media'
 const STORE = 'files'
@@ -30,7 +31,7 @@ const urls = new Map<string, string>()
 type Stored = { bytes: ArrayBuffer; modified: number }
 const get = (name: string) => tx<Stored | undefined>('readonly', (s) => s.get(name))
 
-const files: MediaFiles = {
+const files: MediaFiles & { url(name: string): Promise<string | null> } = {
   async list() {
     const [keys, values] = await Promise.all([tx('readonly', (s) => s.getAllKeys()), tx<Stored[]>('readonly', (s) => s.getAll())])
     return keys.map((key, i) => ({ name: String(key), modified: values[i].modified }))
@@ -39,7 +40,8 @@ const files: MediaFiles = {
   write: async (name, bytes) => {
     await tx('readwrite', (s) => s.put({ bytes: bytes.slice().buffer, modified: Date.now() } satisfies Stored, name))
   },
-  async remove(name) {
+  async remove(name, keepSince) {
+    if (keepSince !== undefined && ((await get(name))?.modified ?? 0) >= keepSince) return
     await tx('readwrite', (s) => s.delete(name))
     if (urls.has(name)) URL.revokeObjectURL(urls.get(name)!)
     urls.delete(name)
@@ -75,45 +77,46 @@ function choose(options: { multiple?: boolean; capture?: boolean }): Promise<Fil
 
 const hex = (buffer: ArrayBuffer) => [...new Uint8Array(buffer)].map((b) => b.toString(16).padStart(2, '0')).join('')
 
-function encode(canvas: HTMLCanvasElement, type: string, quality: number): Promise<Blob | null> {
-  return new Promise((resolve) => canvas.toBlob(resolve, type, quality))
+// The image type from the file's first bytes, as PhotoImport.java decides it.
+function extension(b: Uint8Array): string | null {
+  const ascii = (from: number, to: number) => String.fromCharCode(...b.subarray(from, to))
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'jpg'
+  if (b[0] === 0x89 && ascii(1, 4) === 'PNG') return 'png'
+  if (ascii(0, 4) === 'GIF8') return 'gif'
+  if (ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WEBP') return 'webp'
+  if (ascii(4, 8) === 'ftyp') {
+    // The major brand, then the compatible ones: an AVIF may declare "mif1" first and "avif" among the others.
+    const box = Math.min(b.length, new DataView(b.buffer, b.byteOffset).getUint32(0))
+    if (/avi[fs]/.test(ascii(8, Math.max(12, box)))) return 'avif'
+    if (/^(hei[cmsx]|hev[cmsx]|mif1|msf1)$/.test(ascii(8, 12))) return 'heic'
+  }
+  return null
 }
 
-async function importFile(file: File): Promise<ImportedPhoto> {
+async function keep(file: File): Promise<PhotoRef> {
   const original = new Uint8Array(await file.arrayBuffer())
-  const key = hex(await crypto.subtle.digest('SHA-256', original)).slice(0, 32)
-  const bitmap = await createImageBitmap(file) // applies the EXIF orientation
-  const scale = Math.min(1, LONG_SIDE / Math.max(bitmap.width, bitmap.height))
-  const canvas = document.createElement('canvas')
-  canvas.width = Math.round(bitmap.width * scale)
-  canvas.height = Math.round(bitmap.height * scale)
-  canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
-  // Browsers that cannot encode WebP return a PNG instead; use JPEG there.
-  let blob = await encode(canvas, 'image/webp', 0.8)
-  let ext = 'webp'
-  if (blob?.type !== 'image/webp') {
-    blob = await encode(canvas, 'image/jpeg', 0.85)
-    ext = 'jpg'
+  const ext = extension(original)
+  if (!ext) throw new Error(`not a supported image: ${file.name}`)
+  const name = `${hex(await crypto.subtle.digest('SHA-256', original)).slice(0, 32)}.${ext}`
+  await files.write(name, original)
+  const photo: PhotoRef = { file: name, taken: exifTaken(original) ?? isoWithOffset(file.lastModified) }
+  const bitmap = await createImageBitmap(file).catch(() => null) // applies the EXIF orientation
+  if (bitmap) {
+    photo.width = bitmap.width
+    photo.height = bitmap.height
   }
-  if (!blob) throw new Error(`cannot encode ${file.name}`)
-  const name = `${key}.${ext}`
-  await files.write(name, new Uint8Array(await blob.arrayBuffer()))
-  return {
-    file: name,
-    taken: exifTaken(original) ?? isoWithOffset(file.lastModified),
-    width: bitmap.width,
-    height: bitmap.height,
-    path: file.name,
-  }
+  photo.meta = { format: ext === 'jpg' ? 'jpeg' : ext, bytes: String(original.length) }
+  return photo
 }
 
-async function download(name: string, type: string, bytes: Uint8Array) {
+function download(name: string, url: string) {
   const a = document.createElement('a')
-  a.href = URL.createObjectURL(new Blob([bytes.slice().buffer], { type }))
+  a.href = url
   a.download = name
   a.click()
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000)
 }
+
+const exported = new Set<string>()
 
 export const webPlatform: PhotoPlatform = {
   files,
@@ -123,21 +126,27 @@ export const webPlatform: PhotoPlatform = {
     for (const { name } of list) bytes += (await files.read(name)).length
     return { count: list.length, bytes }
   },
-  pick: async () => Promise.all((await choose({ multiple: true })).map(importFile)),
-  capture: async () => Promise.all((await choose({ capture: true })).map(importFile)),
+  pick: async () => Promise.all((await choose({ multiple: true })).map(keep)),
+  capture: async () => Promise.all((await choose({ capture: true })).map(keep)),
   takeShared: async () => [],
   onShared: () => {},
-  hasOriginal: async () => false,
-  inAlbum: async () => ({}),
-  openOriginal: async () => {},
-  async share(file) {
-    const bytes = await files.read(file)
-    const shared = new File([bytes.slice().buffer], file, { type: contentType(file) })
-    if (navigator.canShare?.({ files: [shared] })) await navigator.share({ files: [shared] })
-    else await download(file, contentType(file), bytes)
+  has: async (file) => !!(await get(file)),
+  preview: (file) => files.url(file),
+  async open(photo) {
+    const url = await files.url(photo.file)
+    if (url) window.open(url, '_blank')
   },
-  async saveCopy(photo) {
-    await download(photo.file, contentType(photo.file), await files.read(photo.file))
-    return { existed: false }
+  async share(photo) {
+    const bytes = await files.read(photo.file)
+    const shared = new File([bytes.slice().buffer], photo.file, { type: contentType(photo.file) })
+    if (navigator.canShare?.({ files: [shared] })) await navigator.share({ files: [shared] })
+    else download(photo.file, (await files.url(photo.file))!)
+  },
+  isExported: async (photo) => exported.has(photo.file),
+  async export(photo) {
+    if (exported.has(photo.file)) return 'existed'
+    download(photo.file, (await files.url(photo.file))!)
+    exported.add(photo.file)
+    return 'saved'
   },
 }

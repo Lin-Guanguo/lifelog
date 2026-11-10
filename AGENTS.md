@@ -28,9 +28,9 @@ pnpm --silent lifelog help
   `purged_at` set marks a permanently deleted row whose text is erased (the CLI hides those).
   `logged_at` is when the entry happened (epoch ms; when written unless a photo's or custom time was chosen),
   unchanged by edits. Analyze live rows unless asked.
-- Photos appear in `content` as lines `![](media/<key>.webp "taken=… size=… model=… gps=lat,lon … path=…")`
+- Photos appear in `content` as lines `![](media/<key>.<ext> "taken=… size=… model=… gps=lat,lon … format=… bytes=…")`
   (docs/spec.md → Photos lists the fields; `%20` = space); treat them as photo references and facts, not text.
-  The CLI does not download photos.
+  The files on WebDAV (`media/`) are the photos' originals; the CLI does not download them.
 - The log is private: don't commit `.env` or `.data/`, and don't send its contents to outside services.
 
 ## Development

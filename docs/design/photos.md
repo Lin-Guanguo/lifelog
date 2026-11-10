@@ -1,5 +1,9 @@
 # Photos in entries — design
 
+> **Superseded in 0.4.4.** LifeLog now keeps each photo's original in its private storage instead of a compressed
+> copy plus links to gallery originals; Android gives no reliable link to other apps' photos, and some photo pickers
+> hand over stripped copies. docs/spec.md → Photos is current. This note records how the 0.4.x design came about.
+
 Built in 0.4.0; [docs/spec.md](../spec.md) → Photos describes what shipped. Not built from this note: deleting
 copies on the server, an optional "keep original" upload, a size limit for copies, iOS.
 

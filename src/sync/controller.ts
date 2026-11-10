@@ -37,7 +37,7 @@ let running: Promise<void> | undefined
 const dav = (settings: WebDavConfig) => createWebDav(settings, platformTransport())
 
 // Photo copies other devices uploaded are fetched from the server when first shown.
-setPhotoDownload((file) => (sync.settings ? downloadPhoto(dav(sync.settings), file) : Promise.resolve(null)))
+setPhotoDownload((file) => (sync.settings ? downloadPhoto(dav(sync.settings), photoFiles, file) : Promise.resolve(false)))
 
 async function saveState() {
   await Preferences.set({ key: STATE_KEY, value: JSON.stringify(sync.state) })

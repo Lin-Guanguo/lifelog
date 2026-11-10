@@ -63,12 +63,14 @@ test('photos: add, choose the time, lay out, view, sync', async ({ page, browser
   await sheet.locator('.tile').nth(1).click()
   const viewer = page.getByRole('dialog', { name: '查看照片' })
   await expect(viewer).toContainText('2 / 2')
-  await expect(viewer).toContainText('同步副本')
-  await expect(viewer.getByRole('button', { name: '用其他应用打开原图' })).toHaveCount(0)
+  // LifeLog keeps the original: its format and size, byte for byte.
+  await expect(viewer).toContainText(`JPEG · `)
+  await expect(viewer.getByRole('button', { name: '用其他应用打开' })).toHaveCount(1)
   const download = page.waitForEvent('download')
   await viewer.getByRole('button', { name: '保存到相册' }).click()
-  expect((await download).suggestedFilename()).toMatch(/^[0-9a-f]{32}\.webp$/)
+  expect((await download).suggestedFilename()).toMatch(/^[0-9a-f]{32}\.jpg$/)
   await expect(viewer.getByRole('button', { name: '保存到相册' })).toBeDisabled()
+  await expect(viewer).toContainText('已在相册')
   await viewer.getByRole('button', { name: '关闭' }).click()
   await expect(viewer).toBeHidden()
 
@@ -172,9 +174,15 @@ test('photos: add, choose the time, lay out, view, sync', async ({ page, browser
   await page.getByLabel('远端目录').fill(FOLDER)
   await page.getByRole('button', { name: '保存并测试连接' }).click()
   await expect(page.getByRole('status')).toContainText('上次同步')
-  const listing = await fetch(`${DAV}${FOLDER}/media/`, { method: 'PROPFIND', headers: { Authorization: AUTH, Depth: '1' } })
+  const listing = await (await fetch(`${DAV}${FOLDER}/media/`, { method: 'PROPFIND', headers: { Authorization: AUTH, Depth: '1' } })).text()
   // The three photos in entries; the one removed in the layout editor was never sent.
-  expect(new Set((await listing.text()).match(/[0-9a-f]{32}\.webp/g)).size).toBe(3)
+  expect(new Set(listing.match(/[0-9a-f]{32}\.jpg/g)).size).toBe(3)
+
+  // What the server has is the original, byte for byte.
+  const original = listing.match(/[0-9a-f]{32}\.jpg/)![0]
+  const remoteBytes = new Uint8Array(await (await fetch(`${DAV}${FOLDER}/media/${original}`, { headers: { Authorization: AUTH } })).arrayBuffer())
+  const sha = Buffer.from(await crypto.subtle.digest('SHA-256', remoteBytes)).toString('hex')
+  expect(original.startsWith(sha.slice(0, 32))).toBe(true)
 
   const laptop = await browser.newContext({ locale: 'zh-CN', viewport: { width: 412, height: 915 } })
   const other = await laptop.newPage()

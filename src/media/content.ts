@@ -1,23 +1,26 @@
 // Photos live in an entry's text as lines of their own (docs/spec.md → Photos):
-//   ![](media/<key>.webp "taken=2026-11-10T14:02:12+08:00 size=4032x3024 model=Pixel%208 gps=31.23,121.47 path=DCIM/Camera/IMG_1.jpg")
-// <key> is a hash of the original file; the title fields are optional facts about the original: space-separated
-// name=value tokens (spaces and % in values written as %20 and %25), path last and as is.
+//   ![](media/<key>.jpg "taken=2026-11-10T14:02:12+08:00 size=4032x3024 model=Pixel%208 gps=31.23,121.47 format=jpeg bytes=3089805")
+// The file is the photo's original, kept by LifeLog; <key> is a hash of its bytes. The title fields are facts about
+// it: space-separated name=value tokens (spaces and % in values written as %20 and %25). Lines written by 0.4.x point
+// at compressed .webp copies and may end with path=… (where the original was then), kept as is.
 
 export interface PhotoRef {
-  file: string // '<key>.webp' (or .jpg), under media/
+  file: string // '<key>.<ext>' under media/: the original (or, from 0.4.x, a compressed .webp copy)
   taken?: string // capture time, ISO 8601 with offset
   width?: number // the original's size
   height?: number
   // Other facts from the original's EXIF, in order: make, model, lens, focal, focal35, f, exposure, iso, flash, gps,
   // alt, format, bytes; fields this version does not know are kept as they are.
   meta?: Record<string, string>
-  path?: string // where the original was found; a hint, may be gone
+  path?: string // 0.4.x only: where the original was found then
 }
 
 export type Block = { type: 'text'; text: string } | { type: 'photo'; photo: PhotoRef }
 
-export const MEDIA_FILE = /^[0-9a-f]{32}\.(webp|jpg)$/
-const LINE = /^!\[[^\]]*\]\(media\/([0-9a-f]{32}\.(?:webp|jpg))(?: "((?:[^"\\]|\\.)*)")?\)$/
+// Image types LifeLog keeps (by their content, not their name).
+export const PHOTO_EXTENSIONS = ['jpg', 'png', 'webp', 'heic', 'avif', 'gif'] as const
+export const MEDIA_FILE = new RegExp(`^[0-9a-f]{32}\\.(${PHOTO_EXTENSIONS.join('|')})$`)
+const LINE = new RegExp(`^!\\[[^\\]]*\\]\\(media\\/([0-9a-f]{32}\\.(?:${PHOTO_EXTENSIONS.join('|')}))(?: "((?:[^"\\\\]|\\\\.)*)")?\\)$`)
 
 export function parsePhotoLine(line: string): PhotoRef | null {
   const match = LINE.exec(line.trim())

@@ -106,7 +106,7 @@ async function capture(browser: Browser, theme: Theme) {
   flow('Photos', 'Under the input: camera, gallery and entry time on the left, 排版 (layout) on the right. Photos wait '
     + 'in a tray above the input; a quick send puts the text first and the photos after it. Photos from the gallery '
     + 'that are not from just now open a step that offers each photo’s capture time. In the list an entry shows up to '
-    + 'four thumbnails; the sheet lays photos out automatically by count; the viewer shows the synced copy.')
+    + 'four thumbnails; the sheet lays photos out automatically by count; the viewer shows the original LifeLog keeps.')
   const morning = (h: number, m: number) => new Date(`2026-11-09T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00+08:00`)
   await choose(page, '从相册选择', [
     { name: 'IMG_0730.jpg', buffer: await jpeg(page, '#7fb2e5', morning(7, 30)) },
@@ -132,8 +132,8 @@ async function capture(browser: Browser, theme: Theme) {
   await shot('Sheet', 'Text, then the photos as one group: 1 keeps its shape (≤160 px tall), 2 side by side, '
     + '3 in a row, 4 as 2×2, 5+ in rows of three.')
   await sheet.locator('.tile').first().click()
-  await shot('Viewer', 'The synced copy. 打开 opens the original with another app (Android’s open-with list) when it is still on the phone; 保存 saves the copy '
-    + '(or shows 已在相册); 分享 shares the original, else the copy.')
+  await shot('Viewer', 'LifeLog keeps each photo’s original (private to the app, not in the system gallery). 打开 opens it '
+    + 'with another app, 保存 saves a copy to the gallery’s LifeLog album once (then 已在相册), 分享 shares the original.')
   await page.getByRole('button', { name: '关闭' }).click()
   await sheet.getByRole('button', { name: '编辑' }).click()
   await expect(page.locator('.editor .thumb img')).toHaveCount(3)

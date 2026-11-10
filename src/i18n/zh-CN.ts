@@ -189,12 +189,9 @@ export default {
 
   'viewer.label': '查看照片',
   'viewer.counter': '{i} / {n}',
-  'viewer.original': '原图在相册 · {name}',
-  'viewer.originalNoName': '原图在相册',
-  'viewer.copy': '同步副本',
-  'viewer.copyInGallery': '副本在相册 · LifeLog',
+  'viewer.inGalleryNote': '已在相册 · LifeLog',
   'viewer.open': '打开',
-  'viewer.openWith': '用其他应用打开原图',
+  'viewer.openWith': '用其他应用打开',
   'viewer.save': '保存',
   'viewer.saveLabel': '保存到相册',
   'viewer.inGallery': '已在相册',
@@ -202,9 +199,10 @@ export default {
   'viewer.savedNotice': '已保存到相册 · LifeLog',
   'viewer.share': '分享',
   'viewer.failed': '没有完成：{error}',
+  'viewer.unavailable': '这张照片还没有同步到这台设备',
 
   'settings.photosSection': '照片',
-  'settings.photosUsage': '照片副本',
+  'settings.photosUsage': '照片',
   'settings.photosValue': '{n} 张 · {size}',
-  'settings.photosHint': '记录里的照片保存压缩副本（长边 1600 像素），原图留在系统相册。每次同步时，删除这台设备上不再被任何记录使用的照片副本（服务器上的保留）。',
+  'settings.photosHint': '记录里的照片保存原图，只存在 LifeLog 里（不进系统相册），并随同步备份。每次同步时，删除这台设备上不再被任何记录使用的照片。',
 } as const

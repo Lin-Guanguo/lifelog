@@ -57,6 +57,9 @@ export function createWebDav(config: WebDavConfig, transport: HttpTransport) {
   const folderUrl = (folder?: string) => dirUrl(segments.length) + (folder ? `${encodeURIComponent(folder)}/` : '')
 
   return {
+    // For transfers made outside this client (native photo upload and download).
+    headers: (): Record<string, string> => ({ Authorization: authorization }),
+
     // A file in the sync folder, or in a subfolder of it (photos live in media/).
     fileUrl: (name: string, folder?: string) => folderUrl(folder) + encodeURIComponent(name),
     folderUrl,
