@@ -104,7 +104,6 @@ export default {
   'sync.manualOnly': '仅手动同步',
   'sync.customTitle': '自定义同步间隔',
   'sync.file': '远端文件：{path}（标准 SQLite 格式，下载后可用任意 SQLite 工具打开）',
-  'sync.remove': '移除同步设置',
   'sync.errorAuth': '用户名或密码错误。',
   'sync.errorHttp': '服务器返回 HTTP {status}。',
   'sync.errorNetwork': '无法连接服务器：{error}',

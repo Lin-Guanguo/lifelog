@@ -114,15 +114,6 @@ export async function setSyncInterval(minutes: number): Promise<void> {
   await saveSettingsOnly()
 }
 
-export async function removeSettings(): Promise<void> {
-  sync.settings = null
-  sync.state = {}
-  sync.status = 'idle'
-  sync.error = ''
-  await Preferences.remove({ key: SETTINGS_KEY })
-  await saveState()
-}
-
 // Single flight: concurrent callers share the running sync.
 export function syncNow(): Promise<void> {
   running ??= (async () => {

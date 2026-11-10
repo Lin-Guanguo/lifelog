@@ -3,7 +3,7 @@ import { computed, reactive, ref } from 'vue'
 import { dateOf, formatMinutes, timeOf } from '../format'
 import DurationDialog from './DurationDialog.vue'
 import { t } from '../i18n'
-import { INTERVAL_PRESETS, remotePath, removeSettings, saveSettings, setSyncInterval, sync, syncNow } from '../sync/controller'
+import { INTERVAL_PRESETS, remotePath, saveSettings, setSyncInterval, sync, syncNow } from '../sync/controller'
 
 const form = reactive({
   url: sync.settings?.url ?? '',
@@ -27,11 +27,6 @@ async function save() {
   formError.value = (await saveSettings({ ...form })) ?? ''
   testing.value = false
 }
-
-async function remove() {
-  await removeSettings()
-  form.password = ''
-}
 </script>
 
 <template>
@@ -50,7 +45,6 @@ async function remove() {
     <button class="secondary" type="button" :disabled="busy || !form.url || !form.username" @click="save">
       {{ testing ? t('sync.testing') : t('sync.saveAndTest') }}
     </button>
-    <button v-if="sync.settings" class="text-btn danger-text" type="button" :disabled="busy" @click="remove">{{ t('sync.remove') }}</button>
   </div>
 
   <template v-if="sync.settings">

@@ -105,7 +105,6 @@ export default {
   'sync.manualOnly': 'Manual sync only',
   'sync.customTitle': 'Custom sync interval',
   'sync.file': 'Remote file: {path} (standard SQLite; open it with any SQLite tool)',
-  'sync.remove': 'Remove sync settings',
   'sync.errorAuth': 'Wrong username or password.',
   'sync.errorHttp': 'The server returned HTTP {status}.',
   'sync.errorNetwork': 'Could not reach the server: {error}',
