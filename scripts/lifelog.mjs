@@ -76,12 +76,16 @@ async function photos() {
   const rows = query(db, `SELECT content, deleted_at FROM records WHERE ${hasPurged ? 'purged_at IS NULL' : '1'} AND content LIKE '%](media/%'`)
   const live = new Set()
   const trash = new Set()
-  const recorded = new Map() // file → bytes its photo line records (0.4.4+)
+  // file → bytes its photo line records, when the line describes the stored file itself (0.4.4+ originals). 0.4.3 lines
+  // describe the original while the stored file is a .webp copy: their format does not match the file type.
+  const recorded = new Map()
   for (const r of rows) {
     for (const [line, file] of String(r.content).matchAll(PHOTO)) {
       ;(r.deleted_at === null ? live : trash).add(file)
       const bytes = / bytes=(\d+)/.exec(line)?.[1]
-      if (bytes) recorded.set(file, Number(bytes))
+      const format = / format=(\w+)/.exec(line)?.[1]
+      const ext = file.split('.').pop()
+      if (bytes && format && (format === ext || (format === 'jpeg' && ext === 'jpg'))) recorded.set(file, Number(bytes))
     }
   }
 
