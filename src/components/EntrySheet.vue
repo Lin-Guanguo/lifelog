@@ -7,6 +7,7 @@ import { t } from '../i18n'
 import { db, openScreen, reloadLive, retentionHours } from '../store'
 import AppIcon from './AppIcon.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
+import EntryContent from './EntryContent.vue'
 
 const SWIPE_PX = 60
 
@@ -67,7 +68,7 @@ function onDragEnd(event: PointerEvent) {
           <div class="meta">{{ dateOf(record.logged_at) }} {{ timeOf(record.logged_at) }}</div>
         </div>
         <div class="sheet-body">
-          <p class="longtext sheet-text">{{ record.content }}</p>
+          <div class="sheet-text"><EntryContent :content="record.content" /></div>
           <div class="sheet-actions">
             <button class="round-btn" type="button" :aria-label="t(expanded ? 'sheet.collapse' : 'sheet.fullscreen')"
               :title="t(expanded ? 'sheet.collapse' : 'sheet.fullscreen')" @click="expanded = !expanded">

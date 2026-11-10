@@ -1,4 +1,4 @@
-// In-memory WebDAV server for tests: PROPFIND (Depth 0), MKCOL, PUT, GET, MOVE, DELETE with
+// In-memory WebDAV server for tests: PROPFIND (Depth 0 and 1), MKCOL, PUT, GET, MOVE, DELETE with
 // Basic auth and ETags. Used directly by unit tests and over HTTP by the browser e2e test.
 
 export interface MockRequest {
@@ -25,14 +25,18 @@ export function createMockDav(username: string, password: string, mount = '/dav/
   const res = (status: number, body = '', headers: Record<string, string> = {}): MockResponse =>
     ({ status, headers, body: text(body) })
 
-  function multistatus(path: string, isDir: boolean, file?: { body: Uint8Array; etag: string; modified: string }) {
-    const props = isDir
+  function response(path: string, file?: { body: Uint8Array; etag: string; modified: string }) {
+    const props = !file
       ? '<d:resourcetype><d:collection/></d:resourcetype>'
-      : `<d:resourcetype/><d:getetag>"${file!.etag}"</d:getetag><d:getlastmodified>${file!.modified}</d:getlastmodified>`
-        + `<d:getcontentlength>${file!.body.length}</d:getcontentlength>`
-    return res(207, `<?xml version="1.0"?><d:multistatus xmlns:d="DAV:"><d:response><d:href>${encodeURI(path)}</d:href>`
-      + `<d:propstat><d:prop>${props}</d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>`,
-    { 'content-type': 'application/xml; charset=utf-8' })
+      : `<d:resourcetype/><d:getetag>"${file.etag}"</d:getetag><d:getlastmodified>${file.modified}</d:getlastmodified>`
+        + `<d:getcontentlength>${file.body.length}</d:getcontentlength>`
+    return `<d:response><d:href>${encodeURI(path)}</d:href>`
+      + `<d:propstat><d:prop>${props}</d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>`
+  }
+
+  function multistatus(responses: string[]) {
+    return res(207, `<?xml version="1.0"?><d:multistatus xmlns:d="DAV:">${responses.join('')}</d:multistatus>`,
+      { 'content-type': 'application/xml; charset=utf-8' })
   }
 
   function handle(req: MockRequest): MockResponse {
@@ -42,8 +46,14 @@ export function createMockDav(username: string, password: string, mount = '/dav/
     const dirPath = path.endsWith('/') ? path : `${path}/`
     switch (method) {
       case 'PROPFIND':
-        if (dirs.has(dirPath)) return multistatus(dirPath, true)
-        if (files.has(path)) return multistatus(path, false, files.get(path))
+        if (dirs.has(dirPath)) {
+          const children = req.headers.depth !== '1' ? [] : [
+            ...[...dirs].filter((d) => d !== dirPath && parent(d) === dirPath).map((d) => response(d)),
+            ...[...files].filter(([f]) => parent(f) === dirPath).map(([f, file]) => response(f, file)),
+          ]
+          return multistatus([response(dirPath), ...children])
+        }
+        if (files.has(path)) return multistatus([response(path, files.get(path))])
         return res(404)
       case 'MKCOL':
         if (dirs.has(dirPath) || files.has(path)) return res(405)

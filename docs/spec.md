@@ -12,7 +12,7 @@ live → trashed → purged (permanently deleted). That one-way rule is what mak
 CREATE TABLE records (
   id          INTEGER PRIMARY KEY, -- one row per saved text; see below
   entry_id    INTEGER NOT NULL,   -- shared by an entry and all its edits: the id of its first row
-  logged_at   INTEGER NOT NULL,   -- original time (ms), copied on edit
+  logged_at   INTEGER NOT NULL,   -- when it happened (ms): when written, or a chosen earlier time; copied on edit
   content     TEXT NOT NULL,
   written_at  INTEGER NOT NULL,   -- when this row was saved
   deleted_at  INTEGER,            -- NULL = live; set = in the trash
@@ -55,6 +55,37 @@ device that still has the text bring it back; they are tiny.
 
 Settings (retention, language, sync) live in Capacitor Preferences, not in the table.
 
+## Photos
+
+An entry's text may contain photo lines; nothing else about photos is stored (no table, no schema change):
+
+```
+![](media/<key>.webp "taken=2026-11-10T14:02:12+08:00 size=4032x3024 path=DCIM/Camera/IMG_20261110_140212.jpg")
+```
+
+- `<key>`: the first 32 hex digits of the SHA-256 of the **original** file, so the same photo gets the same key on
+  every device. The line points at LifeLog's **compressed copy** (long side 1600 px, WebP quality 0.8; JPEG where the
+  WebView cannot encode WebP), which has no EXIF (no location). Copies never change once written.
+- Title fields, all optional hints about the original: `taken` (capture time from EXIF, with offset; else the
+  gallery's date taken), `size` (pixels), `path` (folder/name where it was found; may be gone, which is fine).
+  `"` and `\` are escaped; `path` comes last.
+- A photo is a line of its own with a blank line around it; any other line is plain text (no Markdown rendering).
+  Lists and search use the text without photo lines.
+- The original stays in the system gallery; LifeLog never moves, uploads or deletes it. Where it was found is
+  remembered on this device only (Android content URI, never synced) for "open in gallery" and sharing it.
+- Copies live in the app's files (`media/`; IndexedDB in the browser build) and on the server in `<folder>/media/`.
+  Permanent deletion does not delete copies yet (cleanup needs a scan of every row; planned separately).
+
+Adding photos (Android, no permissions): the system photo picker (several at once), the system camera (one photo,
+saved to Pictures/LifeLog), or Share → LifeLog from another app. A quick send puts the text first and the photos after
+it; 排版 (layout) opens the draft in the editor to place photos between paragraphs. Photos in a row form one group
+laid out by count: 1 keeps its shape (≤160 px tall, ≤70 % wide, cropped to 3:4 … 2:1), 2 side by side, 3 in a row,
+4 as 2×2, 5+ in rows of three.
+
+Entry time: when photos from the picker or Share include one taken over 30 minutes ago, a step offers each photo's
+capture time, now, or a custom time (also from the clock under the input: last week's days, or any earlier date,
+and hour/minute; never later than now). The entry's `logged_at` is that time.
+
 ## Sync (WebDAV)
 
 Configured with server URL, username, password and remote folder (created if missing; https only on
@@ -74,7 +105,9 @@ One sync step:
    yet) with a plain `PUT` over `lifelog.sqlite`. Otherwise just adopt the remote version (no ping-pong
    between devices). Uploading to a temporary name and `MOVE`-ing it over the target is not portable:
    Nutstore (坚果云) answers 409 to a MOVE onto an existing file even with `Overwrite: T`. A leftover
-   `lifelog.sqlite.uploading` from v0.2.0–0.2.2 is deleted after the next upload.
+   `lifelog.sqlite.uploading` from v0.2.0–0.2.2 is deleted after the next upload. Before the database, photo
+   copies this device has that rows reference and `<folder>/media/` lacks (one `PROPFIND`, `Depth: 1`) are
+   uploaded, so the server never references a missing photo. Other devices download a copy when they first show it.
 
 Automatic sync runs on start, on resume and every minute while open, but only once the chosen
 interval (5 minutes / 1 hour / 1 day, or custom minutes/hours/days or manual only; default 1 day) has passed since the last sync or
@@ -94,9 +127,16 @@ WebView's `fetch` is subject to CORS and Capacitor's HTTP plugin cannot send Web
     Dragging the handle up expands, down collapses or closes.
   - Long-press: multi-select; tap more rows; delete moves them to the trash.
   - "LifeLog ›" opens Settings; the search icon opens Search.
-- **Edit**: explicit Save; leaving with changes (back arrow or Android back) asks Save / Discard / Keep editing. Unchanged text saves nothing.
+  - Composer: the input, then camera / gallery / entry time on the left and 排版 (layout) on the right; photos wait in a
+    tray above the input, a chosen time shows as a chip.
+- **Edit** (and **New entry**, from 排版): text fields and photo thumbnails, no formatting; camera / gallery insert at the
+  cursor; long-press a photo to move it (the entry shrinks to an overview, the bottom bar becomes a remove zone).
+  Explicit Save; leaving with changes (back arrow or Android back) asks Save / Discard / Keep editing. Unchanged text saves nothing.
+- **Photo viewer** (tap a photo in the sheet): the synced copy, full screen, swipe between photos; open the original in
+  the gallery (when still on this device), save the copy to the gallery (JPEG with the capture time; "already in
+  gallery" when the original is there), share (the original, else the copy).
 - **Search**: highlighted matches grouped by day; tap opens the sheet.
-- **Settings**: language (system / 中文 / English); trash auto-clear period (presets + custom dialog) and trash entry; WebDAV sync (connection, status, sync now, interval); about (check for updates, author pop-up). The main header shows a sync status chip.
+- **Settings**: language (system / 中文 / English); trash auto-clear period (presets + custom dialog) and trash entry; photo copies (count, size); WebDAV sync (connection, status, sync now, interval); about (check for updates, author pop-up). The main header shows a sync status chip.
 - **Trash**: search box; cards grouped by entry (current text shown for reference); rows show original/saved time and days left; select rows or whole entries; restore or delete forever.
 
 ## Updates and releases
@@ -117,5 +157,7 @@ Dates and durations use `Intl.DateTimeFormat` / `Intl.NumberFormat` with the act
 
 ## Not yet
 
-- iOS (needs an iOS counterpart of the native WebDAV HTTP plugin).
+- iOS (needs iOS counterparts of the native WebDAV HTTP and Photos plugins; copies would be JPEG).
+- Deleting photo copies that no row references any more (locally and on the server).
+- Pinch to zoom in the photo viewer.
 - Context lines around search matches.

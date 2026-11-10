@@ -22,6 +22,7 @@ export type Screen =
   | { name: 'settings' }
   | { name: 'trash' }
   | { name: 'edit'; entryId: number }
+  | { name: 'compose' } // the draft in the layout editor
 
 // Screens stacked over the always-mounted main log.
 export const screens = ref<Screen[]>([])

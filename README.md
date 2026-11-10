@@ -70,6 +70,14 @@ and Android tests, builds the APK signed with the key from the repository secret
 `LIFELOG_KEYSTORE_PASSWORD`, tags `vX.Y.Z` and publishes the Release with `lifelog-X.Y.Z.apk`. Installed apps find it
 through their update check.
 
+To try a version on the phone first, publish it as a pre-release; installed apps' update check skips it, and the APK
+is on the release page. Once it works, make it the latest release:
+
+```bash
+gh workflow run release.yml -f prerelease=true
+gh release edit vX.Y.Z --prerelease=false --latest
+```
+
 ## Read the data on a computer
 
 The app syncs a standard SQLite file to `<folder>/lifelog.sqlite` on WebDAV. `scripts/lifelog.mjs` fetches

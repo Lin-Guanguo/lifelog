@@ -8,6 +8,7 @@ import { closeScreen, db, reloadLive, retentionHours } from '../store'
 import AppIcon from '../components/AppIcon.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import HighlightText from '../components/HighlightText.vue'
+import { photosOf, textOf } from '../media/content'
 
 interface Group {
   entryId: number
@@ -137,7 +138,7 @@ onMounted(load)
           <span class="tag" :class="{ gone: !group.current }">{{ group.current ? t('trash.hasCurrent') : t('trash.wholeDeleted') }}</span>
         </label>
         <div v-if="group.current" class="current">
-          <span class="current-label">{{ t('trash.current') }}</span> {{ group.current.content }}
+          <span class="current-label">{{ t('trash.current') }}</span> {{ textOf(group.current.content) }}
         </div>
         <label v-for="row in group.rows" :key="row.id" class="trow" :class="{ selected: selected.has(row.id) }">
           <input type="checkbox" :checked="selected.has(row.id)" @change="toggle(row.id)">
@@ -146,7 +147,8 @@ onMounted(load)
               <span>{{ rowLabel(row) }}</span>
               <span v-if="rowTimeLeft(row) !== null" class="left">{{ t('trash.left', { duration: rowTimeLeft(row)! }) }}</span>
             </span>
-            <span class="trow-text"><HighlightText :text="row.content" :query="query.trim()" /></span>
+            <span class="trow-text"><HighlightText :text="textOf(row.content)" :query="query.trim()" /></span>
+            <span v-if="photosOf(row.content).length" class="trow-photos">{{ t('photo.count', { n: photosOf(row.content).length }) }}</span>
           </span>
         </label>
       </section>
@@ -171,9 +173,9 @@ onMounted(load)
       @cancel="dialog = undefined">
       <div v-if="selectedRows.length === 1" class="compare">
         <small>{{ t('trash.current') }}</small>
-        <div>{{ live.find((l) => l.entry_id === selectedRows[0].entry_id)?.content }}</div>
+        <div>{{ textOf(live.find((l) => l.entry_id === selectedRows[0].entry_id)?.content ?? '') }}</div>
         <small>{{ t('trash.restoreAs') }}</small>
-        <div>{{ selectedRows[0].content }}</div>
+        <div>{{ textOf(selectedRows[0].content) }}</div>
       </div>
       <template #actions>
         <button class="secondary" type="button" @click="dialog = undefined">{{ t('common.cancel') }}</button>
@@ -204,5 +206,6 @@ onMounted(load)
 .trow-body { flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .trow-meta { display: flex; gap: 8px; font-size: 12px; color: var(--muted); }
 .trow-meta .left { margin-left: auto; color: var(--warn); flex-shrink: 0; }
+.trow-photos { font-size: 12px; color: var(--muted); }
 .trow-text { font-size: 15px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
 </style>

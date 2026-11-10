@@ -2,6 +2,7 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import { getLocalePreference, getRetentionHours } from './data/preferences'
 import { openRecords } from './data/sqlite'
+import { loadPhotos } from './media/photos'
 import { localePreference, t } from './i18n'
 import { reloadLive, retentionHours, setRecords } from './store'
 import { loadSync, noteChange } from './sync/controller'
@@ -11,6 +12,7 @@ async function start() {
   localePreference.value = await getLocalePreference()
   try {
     await loadSync()
+    await loadPhotos()
     const records = await openRecords(noteChange)
     setRecords(records)
     retentionHours.value = await getRetentionHours()

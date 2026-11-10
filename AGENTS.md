@@ -25,7 +25,10 @@ pnpm --silent lifelog help
   entry's first row). Rows with the same `entry_id` are one entry and its edits;
   `deleted_at IS NULL` marks the entry's current text, other rows are in the trash (deleted or pre-edit);
   `purged_at` set marks a permanently deleted row whose text is erased (the CLI hides those).
-  `logged_at` is when the entry was written (epoch ms), unchanged by edits. Analyze live rows unless asked.
+  `logged_at` is when the entry happened (epoch ms; when written unless a photo's or custom time was chosen),
+  unchanged by edits. Analyze live rows unless asked.
+- Photos appear in `content` as lines `![](media/<key>.webp "taken=… size=… path=…")` (docs/spec.md → Photos);
+  treat them as photo references, not text. The CLI does not download photos.
 - The log is private: don't commit `.env` or `.data/`, and don't send its contents to outside services.
 
 ## Development
@@ -42,8 +45,9 @@ pnpm android && (cd android && ./gradlew :app:testDebugUnitTest assembleDebug)  
 ```
 
 Layout: `src/views` (screens), `src/components`, `src/data` (all SQL in `records.ts`, platform-free;
-`schema.ts` migrations; `sqlite.ts` Capacitor adapter), `src/sync` (WebDAV), `src/i18n`, `e2e`,
-`test-support` (mock WebDAV server), `android` (incl. the native `WebDavHttpPlugin`), `resources` (icon source).
+`schema.ts` migrations; `sqlite.ts` Capacitor adapter), `src/media` (photo lines, copies, platform: native
+`PhotosPlugin` on Android, `web.ts` in the browser), `src/sync` (WebDAV), `src/i18n`, `e2e`,
+`test-support` (mock WebDAV server), `android` (incl. the native `WebDavHttpPlugin` and `PhotosPlugin`), `resources` (icon source).
 
 Rules that are easy to break:
 - **Schema**: never edit a shipped migration in `src/data/schema.ts`; append a new one. The version is

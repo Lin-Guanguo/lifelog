@@ -3,6 +3,17 @@
 Each release's notes come from its section here (the release workflow requires one) and are shown in the app's
 update dialog.
 
+## 0.4.0
+
+- Photos in entries: take one with the camera, choose several from the gallery, or share them to LifeLog from
+  another app. LifeLog keeps a compressed copy (1600 px, no location data); the original stays in the gallery.
+- 排版 (layout): place photos between paragraphs; long-press a photo to move it or drag it away to remove it.
+  Photos in a row are laid out automatically.
+- Entry time: older photos offer their capture time for the entry; the clock under the input sets any earlier time.
+- Photo viewer: open the original in the gallery, save the copy, or share.
+- Sync uploads photo copies (to `media/` next to the database); other devices download them when shown.
+- Search ignores photo details. Photo copies are not deleted yet when entries are permanently deleted.
+
 ## 0.3.0
 
 - Sync is now safe with several devices writing: rows only move forward (live → trash → permanently deleted),

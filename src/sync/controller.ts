@@ -2,10 +2,11 @@ import { Capacitor } from '@capacitor/core'
 import { Preferences } from '@capacitor/preferences'
 import { reactive } from 'vue'
 import { NewerSchemaError } from '../data/schema'
+import { platform, setPhotoDownload } from '../media/photos'
 import { t } from '../i18n'
 import { db, reloadLive } from '../store'
 import { platformTransport } from './http'
-import { REMOTE_FILE, sync as syncOnce, type SyncState } from './sync'
+import { downloadPhoto, REMOTE_FILE, sync as syncOnce, type SyncState } from './sync'
 import { createWebDav, WebDavError, type WebDavConfig } from './webdav'
 
 export interface SyncSettings extends WebDavConfig {
@@ -34,6 +35,9 @@ let lastAttemptAt = 0
 let running: Promise<void> | undefined
 
 const dav = (settings: WebDavConfig) => createWebDav(settings, platformTransport())
+
+// Photo copies other devices uploaded are fetched from the server when first shown.
+setPhotoDownload((file) => (sync.settings ? downloadPhoto(dav(sync.settings), file) : Promise.resolve(null)))
 
 async function saveState() {
   await Preferences.set({ key: STATE_KEY, value: JSON.stringify(sync.state) })
@@ -129,7 +133,8 @@ export function syncNow(): Promise<void> {
     lastAttemptAt = Date.now()
     let changesAtUpload = changes
     try {
-      const result = await syncOnce(dav(settings), db(), sync.state, sync.dirty, () => { changesAtUpload = changes })
+      const result = await syncOnce(dav(settings), db(), sync.state, sync.dirty, () => { changesAtUpload = changes },
+        Date.now(), platform.files)
       sync.state = result.state
       if (result.merged) await reloadLive()
       // Writes made after the snapshot was taken are still pending.

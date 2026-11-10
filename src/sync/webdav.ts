@@ -21,6 +21,11 @@ const PROPFIND_BODY = new TextEncoder().encode(
   + '<d:getetag/><d:getlastmodified/><d:getcontentlength/><d:resourcetype/></d:prop></d:propfind>',
 )
 
+export interface RemoteFile {
+  name: string
+  modified: number // ms; NaN when the server does not say
+}
+
 function prop(xml: string, name: string): string | undefined {
   const match = new RegExp(`<(?:[\\w-]+:)?${name}[^>]*>([^<]*)</`, 'i').exec(xml)
   return match?.[1].trim()
@@ -49,8 +54,12 @@ export function createWebDav(config: WebDavConfig, transport: HttpTransport) {
     return prop(xml, 'getetag') || `${prop(xml, 'getlastmodified') ?? ''}|${prop(xml, 'getcontentlength') ?? ''}`
   }
 
+  const folderUrl = (folder?: string) => dirUrl(segments.length) + (folder ? `${encodeURIComponent(folder)}/` : '')
+
   return {
-    fileUrl: (name: string) => dirUrl(segments.length) + encodeURIComponent(name),
+    // A file in the sync folder, or in a subfolder of it (photos live in media/).
+    fileUrl: (name: string, folder?: string) => folderUrl(folder) + encodeURIComponent(name),
+    folderUrl,
 
     // Also proves the credentials work against the server root.
     async ensureDirectory(): Promise<void> {
@@ -64,12 +73,32 @@ export function createWebDav(config: WebDavConfig, transport: HttpTransport) {
 
     version,
 
+    // Creates a subfolder of the sync folder when missing.
+    async ensureFolder(folder: string): Promise<void> {
+      if (await version(folderUrl(folder)) === null) await request('MKCOL', folderUrl(folder), [201, 405])
+    },
+
+    // Files directly in a folder; null when the folder does not exist.
+    async list(url: string): Promise<RemoteFile[] | null> {
+      const res = await request('PROPFIND', url, [207, 404], { Depth: '1', 'Content-Type': 'application/xml; charset=utf-8' }, PROPFIND_BODY)
+      if (res.status === 404) return null
+      const xml = new TextDecoder().decode(res.body)
+      const files: RemoteFile[] = []
+      for (const [response] of xml.matchAll(/<(?:[\w-]+:)?response[\s>][\s\S]*?<\/(?:[\w-]+:)?response>/gi)) {
+        if (/<(?:[\w-]+:)?collection\s*\/?>/i.test(response)) continue
+        const href = prop(response, 'href')
+        const name = href && decodeURIComponent(href.replace(/\/+$/, '').split('/').pop() ?? '')
+        if (name) files.push({ name, modified: Date.parse(prop(response, 'getlastmodified') ?? '') })
+      }
+      return files
+    },
+
     async get(url: string): Promise<Uint8Array> {
       return (await request('GET', url, [200])).body
     },
 
-    async put(url: string, body: Uint8Array): Promise<void> {
-      await request('PUT', url, [200, 201, 204], { 'Content-Type': 'application/vnd.sqlite3' }, body)
+    async put(url: string, body: Uint8Array, contentType = 'application/vnd.sqlite3'): Promise<void> {
+      await request('PUT', url, [200, 201, 204], { 'Content-Type': contentType }, body)
     },
 
     // Succeeds when the file is already gone.

@@ -8,6 +8,7 @@ import { closeScreen, db, liveRecords } from '../store'
 import AppIcon from '../components/AppIcon.vue'
 import EntrySheet from '../components/EntrySheet.vue'
 import HighlightText from '../components/HighlightText.vue'
+import { photosOf, textOf } from '../media/content'
 
 const query = ref('')
 const results = ref<LogRecord[]>([])
@@ -48,7 +49,10 @@ onMounted(() => input.value?.focus())
           <h2 class="section-title" style="margin: 0; padding: 10px 14px 2px">{{ day.label }}</h2>
           <button v-for="record in day.rows" :key="record.id" class="entry result" type="button" @click="sheetRecord = record">
             <time>{{ timeOf(record.logged_at) }}</time>
-            <span class="text"><HighlightText :text="record.content" :query="query.trim()" /></span>
+            <span class="text">
+              <HighlightText :text="textOf(record.content)" :query="query.trim()" />
+              <small v-if="photosOf(record.content).length" class="photo-count">{{ t('photo.count', { n: photosOf(record.content).length }) }}</small>
+            </span>
           </button>
         </section>
       </template>
@@ -59,5 +63,6 @@ onMounted(() => input.value?.focus())
 
 <style scoped>
 .result-day { margin-bottom: 12px; padding-bottom: 4px; }
+.photo-count { display: block; margin-top: 2px; font-size: 12px; color: var(--muted); }
 .result { width: 100%; border: 0; background: transparent; text-align: left; padding: 9px 14px; border-radius: 0; }
 </style>

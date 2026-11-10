@@ -1,10 +1,16 @@
 # Builds a signed APK and publishes it as a GitHub Release. Started by hand only, from main:
-#   gh workflow run release.yml   (or Actions → Release → Run workflow)
+#   gh workflow run release.yml                      (or Actions → Release → Run workflow)
+#   gh workflow run release.yml -f prerelease=true   (to try it on a phone first; the app's update check skips it)
 # The version is package.json's; its notes are its section in CHANGELOG.md.
 name: Release
 
 on:
   workflow_dispatch:
+    inputs:
+      prerelease:
+        description: Pre-release (installed apps do not see it; promote it later)
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -55,4 +61,4 @@ jobs:
           mise x -- apksigner verify --print-certs "$RUNNER_TEMP/lifelog-$VERSION.apk" | grep SHA-256
 
       - name: Publish the release
-        run: gh release create "v$VERSION" "$RUNNER_TEMP/lifelog-$VERSION.apk" --target "$GITHUB_SHA" --title "LifeLog $VERSION" --notes-file "$RUNNER_TEMP/notes.md"
+        run: gh release create "v$VERSION" "$RUNNER_TEMP/lifelog-$VERSION.apk" --target "$GITHUB_SHA" --title "LifeLog $VERSION" --notes-file "$RUNNER_TEMP/notes.md" ${{ inputs.prerelease && '--prerelease' || '' }}

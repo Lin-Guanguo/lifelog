@@ -16,6 +16,13 @@ export function dateOf(ms: number): string {
   return new Intl.DateTimeFormat(locale.value, { month: 'short', day: 'numeric', weekday: 'short' }).format(ms)
 }
 
+// "今天 14:02", "昨天 19:30", or the date and time.
+export function logTime(ms: number, now = Date.now()): string {
+  const key = dayKey(ms)
+  const day = key === dayKey(now) ? t('time.today') : key === dayKey(now - 86_400_000) ? t('time.yesterday') : dateOf(ms)
+  return `${day} ${timeOf(ms)}`
+}
+
 export function dayLabel(ms: number, now = Date.now()): string {
   const key = dayKey(ms)
   if (key === dayKey(now)) return t('day.today', { date: dateOf(ms) })
@@ -55,4 +62,9 @@ export function formatMinutes(minutes: number): string {
 export function formatRemaining(ms: number): string {
   const hours = Math.ceil(ms / 3_600_000)
   return hours >= 24 ? unit(Math.ceil(hours / 24), 'day') : unit(hours, 'hour')
+}
+
+export function formatBytes(bytes: number): string {
+  const [value, u] = bytes >= 1e9 ? [bytes / 1e9, 'gigabyte'] : bytes >= 1e6 ? [bytes / 1e6, 'megabyte'] : [bytes / 1e3, 'kilobyte']
+  return new Intl.NumberFormat(locale.value, { style: 'unit', unit: u, unitDisplay: 'short', maximumFractionDigits: 1 }).format(value)
 }

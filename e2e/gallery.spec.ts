@@ -1,6 +1,7 @@
 import { devices, expect, test, type Browser, type Page } from '@playwright/test'
 import { readFileSync, writeFileSync } from 'node:fs'
 import pkg from '../package.json' with { type: 'json' }
+import { choose, jpeg } from './images'
 
 // Renders every screen of the real app (production build) in light and dark mode and writes a
 // self-contained review page: docs/design/ui.html. Run with `pnpm gallery`.
@@ -32,7 +33,8 @@ async function capture(browser: Browser, theme: Theme) {
   async function shot(title: string, note: string) {
     // Vue starts enter/leave transitions a frame after the change; wait for them to start and finish.
     await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))))
-    await page.waitForFunction(() => document.getAnimations().length === 0)
+    // Endless ones (a spinner, the drop slot's pulse) are left running.
+    await page.waitForFunction(() => document.getAnimations().every((a) => a.effect?.getTiming().iterations === Infinity))
     const image = (await page.screenshot({ type: 'jpeg', quality: 80, animations: 'disabled' })).toString('base64')
     const list = flows[flowIndex].shots
     list[shotIndex] ??= { id: `${flowIndex + 1}.${shotIndex + 1}`, title, note, images: {} }
@@ -99,6 +101,61 @@ async function capture(browser: Browser, theme: Theme) {
   await shot('Leaving with changes', 'Save / Discard / Keep editing.')
   await page.getByRole('alertdialog').getByRole('button', { name: '保存', exact: true }).click()
   await expect(entry('同样重量，8 次')).toBeVisible()
+
+  flow('Photos', 'Under the input: camera, gallery and entry time on the left, 排版 (layout) on the right. Photos wait '
+    + 'in a tray above the input; a quick send puts the text first and the photos after it. Photos from the gallery '
+    + 'that are not from just now open a step that offers each photo’s capture time. In the list an entry shows up to '
+    + 'four thumbnails; the sheet lays photos out automatically by count; the viewer shows the synced copy.')
+  const morning = (h: number, m: number) => new Date(`2026-11-09T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00+08:00`)
+  await choose(page, '从相册选择', [
+    { name: 'IMG_0730.jpg', buffer: await jpeg(page, '#7fb2e5', morning(7, 30)) },
+    { name: 'IMG_0741.jpg', buffer: await jpeg(page, '#e5a77f', morning(7, 41)) },
+    { name: 'IMG_0802.jpg', buffer: await jpeg(page, '#8fd19e', morning(8, 2), { width: 1800, height: 2400 }) },
+  ])
+  const step = page.getByRole('dialog', { name: '记录时间' })
+  await expect(step.locator('.option img')).toHaveCount(3)
+  await shot('Older photos: choose the time', 'Opens by itself after 相册 or Share when a photo is over 30 minutes old. '
+    + 'Each photo’s capture time, large; now and custom fixed at the bottom. Starts on the first photo.')
+  await step.getByRole('button', { name: /自定义/ }).click()
+  await shot('Custom time', 'Also from 🕑 under the input. Day chips for the last week (更早 = system date picker), '
+    + 'hour and minute wheels; never later than now.')
+  await page.getByRole('dialog', { name: '记录时间' }).last().getByRole('button', { name: '取消' }).click()
+  await step.getByRole('button', { name: /^记在/ }).click()
+  await page.getByRole('textbox', { name: '新记录' }).fill('早上去江边走了一圈')
+  await shot('Tray and time chip', 'Older photos show their time; the chip shows the chosen time (✕ = now, tap = change).')
+  await page.getByRole('button', { name: '发送' }).click()
+  await expect(entry('早上去江边').locator('.strip img')).toHaveCount(3)
+  await shot('Entry with photos', 'Logged at the first photo’s time (07:30), so it sits before 08:12.')
+  await entry('早上去江边').click()
+  await expect(sheet.locator('.photo-group img')).toHaveCount(3)
+  await shot('Sheet', 'Text, then the photos as one group: 1 keeps its shape (≤160 px tall), 2 side by side, '
+    + '3 in a row, 4 as 2×2, 5+ in rows of three.')
+  await sheet.locator('.tile').first().click()
+  await shot('Viewer', 'The synced copy. 相册 opens the original when it is still on the phone; 保存 saves the copy '
+    + '(or shows 已在相册); 分享 shares the original, else the copy.')
+  await page.getByRole('button', { name: '关闭' }).click()
+  await sheet.getByRole('button', { name: '编辑' }).click()
+  await expect(page.locator('.editor .thumb img')).toHaveCount(3)
+  await shot('Editor with photos', 'Plain text fields and thumbnails; 📷 / 🖼 insert at the cursor. No formatting.')
+  const held = (await page.locator('.editor .thumb').nth(1).boundingBox())!
+  await page.mouse.move(held.x + 30, held.y + 30)
+  await page.mouse.down()
+  await page.mouse.move(held.x + 40, held.y + 40, { steps: 3 })
+  await expect(page.locator('.editor.arranging')).toBeVisible()
+  await shot('Moving a photo', 'Long-press (or the grip): the entry shrinks to an overview, photo groups are tinted, '
+    + 'a dashed box shows where it lands, the bottom bar removes it.')
+  const zone = (await page.locator('.dropzone').boundingBox())!
+  await page.mouse.move(zone.x + zone.width / 2, zone.y + zone.height / 2, { steps: 5 })
+  await page.mouse.up()
+  await back().click()
+  await page.getByRole('alertdialog').getByRole('button', { name: /不保存/ }).click()
+  await expect(page.locator('.editor')).toHaveCount(0)
+  await page.getByRole('textbox', { name: '新记录' }).fill('午饭\n下午去了博物馆')
+  await page.getByRole('button', { name: '排版' }).click()
+  await shot('Layout editor', '排版 opens the draft in the same editor, to place photos between paragraphs; '
+    + 'back keeps the draft (photos after the text).')
+  await back().click()
+  await page.getByRole('textbox', { name: '新记录' }).fill('')
 
   flow('Multi-select delete', 'Long-press an entry to start selecting; tap more entries; delete moves them all to the trash.')
   const box = (await entry('开始练胸').boundingBox())!

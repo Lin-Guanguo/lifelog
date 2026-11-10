@@ -2,6 +2,11 @@
 import { App as CapApp } from '@capacitor/app'
 import { onMounted, onUnmounted } from 'vue'
 import { handleBack } from './back'
+import { draft, importPhotos, incoming, notice, offerPhotoTimes, timePicker, timeStep } from './compose'
+import { platform } from './media/photos'
+import TimePicker from './components/TimePicker.vue'
+import TimeStep from './components/TimeStep.vue'
+import ComposeView from './views/ComposeView.vue'
 import EditView from './views/EditView.vue'
 import MainView from './views/MainView.vue'
 import SearchView from './views/SearchView.vue'
@@ -11,6 +16,20 @@ import { db, reloadLive, retentionHours, screens } from './store'
 import { autoSync, startAutoSync } from './sync/controller'
 
 const removers: (() => void)[] = []
+
+// Photos shared to LifeLog from another app join the draft. Screens without unsaved work close so the
+// draft is in view; an open edit stays.
+async function receiveShared() {
+  const photos = await importPhotos('shared')
+  if (photos.length === 0) return
+  screens.value = screens.value.filter((s) => s.name === 'edit' || s.name === 'compose')
+  if (screens.value.some((s) => s.name === 'compose')) {
+    incoming.value = photos
+    return
+  }
+  draft.photos.push(...photos)
+  offerPhotoTimes(draft.photos)
+}
 
 onMounted(async () => {
   const back = await CapApp.addListener('backButton', () => {
@@ -23,6 +42,8 @@ onMounted(async () => {
     autoSync()
   })
   removers.push(() => back.remove(), () => resume.remove(), startAutoSync())
+  platform.onShared(() => void receiveShared())
+  await receiveShared()
 })
 onUnmounted(() => removers.forEach((r) => r()))
 </script>
@@ -35,6 +56,10 @@ onUnmounted(() => removers.forEach((r) => r()))
       <SettingsView v-else-if="screen.name === 'settings'" />
       <TrashView v-else-if="screen.name === 'trash'" />
       <EditView v-else-if="screen.name === 'edit'" :entry-id="screen.entryId" />
+      <ComposeView v-else-if="screen.name === 'compose'" />
     </template>
   </TransitionGroup>
+  <TimeStep v-if="timeStep" :photos="timeStep" :current="draft.time" @done="(time) => { draft.time = time; timeStep = null }" @cancel="timeStep = null" />
+  <TimePicker v-if="timePicker" :initial="draft.time" @done="(time) => { draft.time = time; timePicker = false }" @cancel="timePicker = false" />
+  <div v-if="notice" class="notice" role="status">{{ notice }}</div>
 </template>

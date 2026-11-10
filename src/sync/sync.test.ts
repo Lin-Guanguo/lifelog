@@ -6,17 +6,20 @@ import { migrate } from '../data/schema'
 import { fromSqliteFile } from '../data/snapshot'
 import { configureSqlJs, loadSqlJs, sqlJsExecutor } from '../data/sqljs'
 import type { HttpTransport } from './http'
-import { REMOTE_FILE, sync, type SyncState } from './sync'
+import type { MediaFiles } from '../media/files'
+import { downloadPhoto, REMOTE_FILE, sync, type SyncState } from './sync'
 import { createWebDav, WebDavError, type WebDavConfig } from './webdav'
 
 const CONFIG: WebDavConfig = { url: 'https://nas.example/dav', username: 'me', password: 'secret', directory: 'LifeLog/备份' }
 const remotePath = '/dav/LifeLog/备份/lifelog.sqlite'
 let server: ReturnType<typeof createMockDav>
 let requests: string[]
+let puts: string[] // paths, in upload order
 
 function transport(): HttpTransport {
   return async ({ method, url, headers = {}, body }) => {
     requests.push(method)
+    if (method === 'PUT') puts.push(decodeURIComponent(new URL(url).pathname))
     const lower = Object.fromEntries(Object.entries(headers).map(([k, v]) => [k.toLowerCase(), v]))
     return server.handle({ method, path: decodeURIComponent(new URL(url).pathname), headers: lower, body })
   }
@@ -47,6 +50,7 @@ beforeAll(async () => {
 beforeEach(() => {
   server = createMockDav('me', 'secret')
   requests = []
+  puts = []
 })
 
 describe('sync', () => {
@@ -142,6 +146,44 @@ describe('sync', () => {
     expect(stateA.remoteVersion).toBe(stateB.remoteVersion)
   })
 
+  it('uploads referenced photo copies before the database, once each', async () => {
+    const photo = (c: string) => `${c.repeat(32)}.webp`
+    const files = memoryFiles({ [photo('a')]: [1], [photo('b')]: [2], [photo('c')]: [3] }) // c: imported, never sent
+    const phone = await device()
+    const dav = createWebDav(CONFIG, transport())
+    await phone.add(`湖边\n\n![](media/${photo('a')})\n\n![](media/${photo('b')})`)
+    let { state } = await sync(dav, phone, {}, true, undefined, 1000, files)
+
+    const media = '/dav/LifeLog/备份/media/'
+    expect([...server.files.keys()].sort()).toEqual([remotePath, `${media}${photo('a')}`, `${media}${photo('b')}`])
+    expect(puts).toEqual([`${media}${photo('a')}`, `${media}${photo('b')}`, remotePath])
+
+    // Already there: listed, not uploaded again. Trashed entries keep their photos.
+    await phone.trashEntries((await phone.listLive()).map((r) => r.entry_id))
+    requests = []
+    ;({ state } = await sync(dav, phone, state, true, undefined, 2000, files))
+    expect(requests.filter((m) => m === 'PUT')).toHaveLength(1)
+
+    // Another device sees the entry and fetches a copy when it shows it.
+    const laptop = await device()
+    await sync(createWebDav(CONFIG, transport()), laptop, {}, false, undefined, 3000, memoryFiles({}))
+    expect((await laptop.listTrash()).trashed).toHaveLength(1)
+    expect([...await downloadPhoto(dav, photo('b'))]).toEqual([2])
+    expect(state.remoteVersion).toBeDefined()
+  })
+
+  it('without photos it makes no extra requests', async () => {
+    const phone = await device()
+    await phone.add('text only')
+    await sync(createWebDav(CONFIG, transport()), phone, {}, true, undefined, 1000, memoryFiles({ [`${'c'.repeat(32)}.webp`]: [1] }))
+    const withPhotos = requests
+    requests = []
+    server = createMockDav('me', 'secret')
+    await sync(createWebDav(CONFIG, transport()), phone, {}, true, undefined, 1000)
+    expect(withPhotos).toEqual(requests)
+    expect([...server.dirs]).not.toContain('/dav/LifeLog/备份/media/')
+  })
+
   it('reports bad credentials as an authentication error', async () => {
     const dav = createWebDav({ ...CONFIG, password: 'wrong' }, transport())
     await expect(sync(dav, await device(), {}, true)).rejects.toBeInstanceOf(WebDavError)
@@ -149,3 +191,13 @@ describe('sync', () => {
     expect(REMOTE_FILE).toBe('lifelog.sqlite')
   })
 })
+
+function memoryFiles(initial: Record<string, number[]>): MediaFiles {
+  const files = new Map<string, Uint8Array>(Object.entries(initial).map(([name, bytes]) => [name, new Uint8Array(bytes)]))
+  return {
+    list: async () => [...files.keys()],
+    read: async (name) => files.get(name)!,
+    write: async (name, bytes) => { files.set(name, bytes) },
+    url: async (name) => (files.has(name) ? `memory:${name}` : null),
+  }
+}

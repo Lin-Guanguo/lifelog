@@ -1,3 +1,4 @@
+import { textOf } from '../media/content'
 import { makeId } from './ids'
 
 export interface LogRecord {
@@ -37,6 +38,12 @@ function likePattern(query: string): string {
   return `%${query.replace(/[!%_]/g, (c) => `!${c}`)}%`
 }
 
+// LIKE finds candidates; a match inside a photo line (file name, path, time) does not count.
+function matchingText(rows: LogRecord[], query: string): LogRecord[] {
+  const q = query.toLowerCase()
+  return rows.filter((r) => textOf(r.content).toLowerCase().includes(q))
+}
+
 function placeholders(values: unknown[]): string {
   return values.map(() => '?').join(',')
 }
@@ -62,17 +69,18 @@ export function createRecords(
       return select('SELECT * FROM records WHERE deleted_at IS NULL ORDER BY logged_at, written_at')
     },
 
-    searchLive(query: string): Promise<LogRecord[]> {
-      return select(
+    async searchLive(query: string): Promise<LogRecord[]> {
+      return matchingText(await select(
         "SELECT * FROM records WHERE deleted_at IS NULL AND content LIKE ? ESCAPE '!' ORDER BY logged_at DESC",
         [likePattern(query)],
-      )
+      ), query)
     },
 
-    async add(content: string): Promise<void> {
+    // loggedAt: when it happened, if not now (e.g. the time a photo was taken).
+    async add(content: string, loggedAt?: number): Promise<void> {
       const t = now()
       const id = await newId(t)
-      await db.run([{ statement: INSERT, values: [id, id, t, content, t] }])
+      await db.run([{ statement: INSERT, values: [id, id, loggedAt ?? t, content, t] }])
     },
 
     async edit(current: LogRecord, content: string): Promise<void> {
@@ -95,7 +103,7 @@ export function createRecords(
     async listTrash(query = ''): Promise<{ trashed: LogRecord[]; live: LogRecord[] }> {
       const order = 'ORDER BY logged_at DESC, written_at DESC'
       const trashed = query
-        ? await select(`SELECT * FROM records WHERE ${IN_TRASH} AND content LIKE ? ESCAPE '!' ${order}`, [likePattern(query)])
+        ? matchingText(await select(`SELECT * FROM records WHERE ${IN_TRASH} AND content LIKE ? ESCAPE '!' ${order}`, [likePattern(query)]), query)
         : await select(`SELECT * FROM records WHERE ${IN_TRASH} ${order}`)
       const entryIds = [...new Set(trashed.map((r) => r.entry_id))]
       const live = entryIds.length
@@ -128,10 +136,12 @@ export function createRecords(
     },
 
     // Permanent deletion of trash rows: their content is erased, the rows stay as tombstones.
+    // The photo copies the text referenced are kept (no cleanup yet).
     async purge(ids: number[]): Promise<void> {
       if (ids.length === 0) return
       await db.run([{ statement: `${PURGE} WHERE ${IN_TRASH} AND id IN (${placeholders(ids)})`, values: [now(), ...ids] }])
     },
+
 
     // Every row, including tombstones, for snapshots.
     all(): Promise<LogRecord[]> {

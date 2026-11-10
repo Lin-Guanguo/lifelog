@@ -1,18 +1,22 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { pushBackHandler } from '../back'
+import { chooseTime, clearDraft, draft, importPhotos, isOld, offerPhotoTimes } from '../compose'
 import type { LogRecord } from '../data/records'
-import { groupByDay, timeOf } from '../format'
+import { groupByDay, logTime, timeOf } from '../format'
 import { t } from '../i18n'
+import { composeContent, photosOf, takenAt, textOf } from '../media/content'
+import type { PhotoSource } from '../media/photos'
 import { db, liveRecords, openScreen, reloadLive } from '../store'
 import AppIcon from '../components/AppIcon.vue'
 import EntrySheet from '../components/EntrySheet.vue'
+import MediaImage from '../components/MediaImage.vue'
+import PhotoStrip from '../components/PhotoStrip.vue'
 import { sync } from '../sync/controller'
 
 const LONG_PRESS_MS = 500
 const MOVE_TOLERANCE_PX = 10
 
-const draft = ref('')
 const composer = ref<HTMLTextAreaElement>()
 const list = ref<HTMLElement>()
 const sheetRecord = ref<LogRecord>()
@@ -102,15 +106,28 @@ async function scrollToBottom() {
   list.value?.scrollTo({ top: list.value.scrollHeight })
 }
 
+const canSend = computed(() => draft.text.trim() !== '' || draft.photos.length > 0)
+
+// The text first, then the photos as one group; at the chosen time if one was set.
 async function send() {
-  const content = draft.value.trim()
-  if (!content) return
-  await db().add(content)
-  draft.value = ''
+  if (!canSend.value) return
+  await db().add(composeContent(draft.text.trim(), draft.photos), draft.time ?? undefined)
+  const earlier = draft.time !== null
+  clearDraft()
   await nextTick()
   resizeComposer()
   await reloadLive()
-  await scrollToBottom()
+  if (!earlier) await scrollToBottom()
+}
+
+async function addPhotos(source: PhotoSource) {
+  const photos = await importPhotos(source)
+  draft.photos.push(...photos)
+  if (source !== 'capture') offerPhotoTimes(draft.photos)
+}
+
+function openLayout() {
+  openScreen({ name: 'compose' })
 }
 
 onMounted(scrollToBottom)
@@ -150,7 +167,10 @@ onMounted(scrollToBottom)
           @click="onClick(record)" @keydown.enter="onClick(record)">
           <input v-if="selecting" type="checkbox" tabindex="-1" :checked="selected.has(record.entry_id)" aria-hidden="true">
           <time>{{ timeOf(record.logged_at) }}</time>
-          <p class="text">{{ record.content }}</p>
+          <div class="body">
+            <p v-if="textOf(record.content)" class="text">{{ textOf(record.content) }}</p>
+            <PhotoStrip v-if="photosOf(record.content).length" :photos="photosOf(record.content)" />
+          </div>
         </div>
       </section>
     </main>
@@ -158,12 +178,33 @@ onMounted(scrollToBottom)
     <footer v-if="selecting" class="footer-bar">
       <button class="danger" type="button" @click="deleteSelected">{{ t('main.deleteSelected', { n: selected.size }) }}</button>
     </footer>
-    <form v-else class="composer" @submit.prevent="send">
-      <textarea ref="composer" v-model="draft" rows="1" :aria-label="t('main.composerLabel')" :placeholder="t('main.placeholder')"
-        @input="resizeComposer"></textarea>
-      <!-- mousedown.prevent keeps the keyboard open between entries -->
-      <button class="primary" type="submit" :disabled="!draft.trim()" @mousedown.prevent>{{ t('main.send') }}</button>
-    </form>
+    <div v-else class="composer-wrap">
+      <div v-if="draft.time !== null" class="timechip">
+        <AppIcon name="clock" :size="18" />
+        <button type="button" class="chip-text" @click="chooseTime(draft.photos)">{{ t('time.logAt', { time: logTime(draft.time) }) }}</button>
+        <button type="button" class="chip-x" :aria-label="t('time.backToNow')" @click="draft.time = null"><AppIcon name="close" :size="16" /></button>
+      </div>
+      <div v-if="draft.photos.length" class="tray">
+        <div v-for="(photo, i) in draft.photos" :key="`${i}:${photo.file}`" class="tray-photo">
+          <MediaImage :photo="photo" />
+          <span v-if="isOld(photo)" class="badge">{{ timeOf(takenAt(photo)!) }}</span>
+          <button class="x" type="button" :aria-label="t('photo.remove')" @click="draft.photos.splice(i, 1)"><AppIcon name="close" :size="12" /></button>
+        </div>
+      </div>
+      <form class="composer" @submit.prevent="send">
+        <textarea ref="composer" v-model="draft.text" rows="1" :aria-label="t('main.composerLabel')" :placeholder="t('main.placeholder')"
+          @input="resizeComposer"></textarea>
+        <!-- mousedown.prevent keeps the keyboard open between entries -->
+        <button class="primary" type="submit" :disabled="!canSend" @mousedown.prevent>{{ t('main.send') }}</button>
+      </form>
+      <div class="tools">
+        <button class="icon-btn tool" type="button" :aria-label="t('photo.camera')" @mousedown.prevent @click="addPhotos('capture')"><AppIcon name="camera" /></button>
+        <button class="icon-btn tool" type="button" :aria-label="t('photo.gallery')" @mousedown.prevent @click="addPhotos('pick')"><AppIcon name="image" /></button>
+        <button class="icon-btn tool" :class="{ set: draft.time !== null }" type="button" :aria-label="t('photo.time')" @mousedown.prevent
+          @click="chooseTime(draft.photos)"><AppIcon name="clock" /></button>
+        <button class="layout" type="button" @mousedown.prevent @click="openLayout"><AppIcon name="layout" :size="20" />{{ t('photo.layout') }}</button>
+      </div>
+    </div>
 
     <EntrySheet v-if="sheetRecord" :record="sheetRecord" @close="sheetRecord = undefined" />
   </div>
@@ -179,5 +220,6 @@ onMounted(scrollToBottom)
 .sync-chip.pending { color: var(--warn); background: var(--warn-soft); }
 .sync-chip.bad { color: var(--danger); }
 .stream { display: flex; flex-direction: column; }
+.entry .body { flex-grow: 1; min-width: 0; }
 .stream > :first-child { margin-top: auto; }
 </style>

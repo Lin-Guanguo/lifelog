@@ -6,13 +6,15 @@ import AppIcon from '../components/AppIcon.vue'
 import DurationDialog from '../components/DurationDialog.vue'
 import SyncSettings from '../components/SyncSettings.vue'
 import { RETENTION_PRESETS, setLocalePreference, setRetentionHours } from '../data/preferences'
-import { formatHours } from '../format'
+import { formatBytes, formatHours } from '../format'
 import { localeName, localePreference, LOCALES, t, type LocalePreference } from '../i18n'
 import { closeScreen, db, openScreen, retentionHours } from '../store'
 import UpdateDialog from '../components/UpdateDialog.vue'
 import { checkForUpdate, update } from '../update/controller'
+import { platform } from '../media/photos'
 
 const trashCount = ref(0)
+const photoUsage = ref<{ count: number; bytes: number }>()
 const isCustom = computed(() => !RETENTION_PRESETS.includes(retentionHours.value))
 useBackHandler(closeScreen)
 
@@ -33,6 +35,7 @@ async function chooseLocale(preference: LocalePreference) {
 
 onMounted(async () => {
   trashCount.value = await db().countTrash()
+  photoUsage.value = await platform.usage()
 })
 </script>
 
@@ -70,6 +73,15 @@ onMounted(async () => {
         <span style="color: var(--muted)">{{ t('settings.trashCount', { n: trashCount }) }}</span>
         <AppIcon name="chevron" :size="16" />
       </button>
+
+      <h2 class="section-title">{{ t('settings.photosSection') }}</h2>
+      <div class="card" style="padding: 14px; display: flex; flex-direction: column; gap: 6px">
+        <div style="display: flex; font-size: 15px">
+          <span style="flex-grow: 1">{{ t('settings.photosUsage') }}</span>
+          <span v-if="photoUsage" style="color: var(--muted)">{{ t('settings.photosValue', { n: photoUsage.count, size: formatBytes(photoUsage.bytes) }) }}</span>
+        </div>
+        <span class="hint" style="margin: 0">{{ t('settings.photosHint') }}</span>
+      </div>
 
       <h2 class="section-title">{{ t('sync.title') }}</h2>
       <SyncSettings />

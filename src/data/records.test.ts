@@ -129,6 +129,28 @@ describe('records', () => {
     expect((await records.all()).map((r) => [r.content, r.purged_at])).toEqual([['', clock], ['new', null]])
   })
 
+  it('can log an entry at an earlier time, ordered by that time', async () => {
+    await records.add('now')
+    tick()
+    await records.add('this afternoon', clock - 3 * HOUR_MS)
+    const live = await records.listLive()
+    expect(live.map((r) => r.content)).toEqual(['this afternoon', 'now'])
+    expect(live[0].logged_at).toBe(clock - 3 * HOUR_MS)
+    expect(live[0].written_at).toBe(clock)
+  })
+
+  it('search matches the words, not the photo lines', async () => {
+    const photo = `![](media/${'a'.repeat(32)}.webp "taken=2026-11-10T14:02:12+08:00 path=DCIM/Camera/IMG_1.jpg")`
+    await records.add(`湖边\n\n${photo}`)
+    await records.add('IMG 文件名')
+    expect((await records.searchLive('湖边')).map((r) => r.content)).toEqual([`湖边\n\n${photo}`])
+    for (const q of ['IMG', 'img']) expect((await records.searchLive(q)).map((r) => r.content)).toEqual(['IMG 文件名'])
+    expect(await records.searchLive('DCIM')).toEqual([])
+    await records.trashEntries((await records.listLive()).map((r) => r.entry_id))
+    expect((await records.listTrash('DCIM')).trashed).toEqual([])
+    expect((await records.listTrash('湖边')).trashed).toHaveLength(1)
+  })
+
   it('searches by substring and treats % and _ literally', async () => {
     await records.add('卧推，60 公斤')
     await records.add('上斜卧推 20 公斤')
