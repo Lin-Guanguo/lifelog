@@ -51,51 +51,37 @@ public class PhotosPlugin extends Plugin {
     private static final String ALBUM = "LifeLog";
 
     private final List<Uri> shared = new ArrayList<>();
-    // A camera photo whose result arrived after Android restarted LifeLog; picked up with the shared photos.
-    private Uri restoredCapture;
-    private Uri captureUri;
+    // A camera photo that arrived after Android restarted LifeLog; handed over with the shared photos.
+    private File restoredCapture;
 
     @Override
     public void load() {
         Activity activity = getActivity();
         if (activity != null && collectShared(activity.getIntent())) activity.setIntent(new Intent());
-        restorePendingCapture();
+        restoredCapture = pendingCapture();
     }
 
-    // The camera may run long enough for Android to stop LifeLog; the photo's address is kept on disk so it is
-    // not lost: published to the gallery and handed to the app at the next start.
+    // The camera writes into LifeLog's cache through its FileProvider, which every camera app supports (writing
+    // into a pending gallery entry owned by LifeLog is not: some cameras report success and save nothing).
+    // LifeLog then adds the photo to the gallery itself. A flag on disk keeps the photo if Android stops LifeLog
+    // while the camera is open.
+    private File captureFile() {
+        return new File(getContext().getCacheDir(), "capture.jpg");
+    }
+
     private SharedPreferences state() {
         return getContext().getSharedPreferences("photos", Context.MODE_PRIVATE);
     }
 
-    private void rememberCapture(Uri uri) {
-        state().edit().putString("pendingCapture", uri != null ? uri.toString() : null).apply();
+    private void rememberCapture(boolean pending) {
+        state().edit().putBoolean("pendingCapture", pending).apply();
     }
 
-    private void restorePendingCapture() {
-        String pending = state().getString("pendingCapture", null);
-        if (pending == null) return;
-        rememberCapture(null);
-        Uri uri = Uri.parse(pending);
-        boolean taken;
-        try (InputStream in = getContext().getContentResolver().openInputStream(uri)) {
-            taken = in != null && in.read() >= 0;
-        } catch (IOException | RuntimeException e) {
-            taken = false;
-        }
-        if (!taken) {
-            discard(uri);
-            return;
-        }
-        publish(uri);
-        restoredCapture = uri;
-    }
-
-    private void publish(Uri uri) {
-        if (Build.VERSION.SDK_INT < 29) return;
-        ContentValues done = new ContentValues();
-        done.put(MediaStore.MediaColumns.IS_PENDING, 0);
-        getContext().getContentResolver().update(uri, done, null, null);
+    private File pendingCapture() {
+        if (!state().getBoolean("pendingCapture", false)) return null;
+        rememberCapture(false);
+        File file = captureFile();
+        return file.length() > 0 ? file : null;
     }
 
     @Override
@@ -161,72 +147,46 @@ public class PhotosPlugin extends Plugin {
 
     @PluginMethod
     public void capture(PluginCall call) {
-        Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-        try {
-            if (Build.VERSION.SDK_INT >= 29) {
-                ContentValues values = new ContentValues();
-                String stamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.ROOT).format(new Date());
-                values.put(MediaStore.MediaColumns.DISPLAY_NAME, "IMG_" + stamp + ".jpg");
-                values.put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg");
-                values.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/" + ALBUM);
-                values.put(MediaStore.MediaColumns.IS_PENDING, 1);
-                captureUri = getContext().getContentResolver().insert(MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY), values);
-            } else {
-                // Older Android: the photo only becomes LifeLog's copy; it is not added to the gallery.
-                File file = new File(getContext().getCacheDir(), "capture.jpg");
-                captureUri = FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".fileprovider", file);
-            }
-        } catch (RuntimeException e) {
-            call.reject("cannot prepare the photo: " + e.getMessage());
-            return;
-        }
-        if (captureUri == null) {
+        File file = captureFile();
+        if (file.exists() && !file.delete()) {
             call.reject("cannot prepare the photo");
             return;
         }
-        intent.putExtra(MediaStore.EXTRA_OUTPUT, captureUri);
-        rememberCapture(captureUri);
+        Uri output;
+        try {
+            output = FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".fileprovider", file);
+        } catch (IllegalArgumentException e) {
+            call.reject("cannot prepare the photo: " + e.getMessage());
+            return;
+        }
+        Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        intent.putExtra(MediaStore.EXTRA_OUTPUT, output);
         intent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        rememberCapture(true);
         try {
             startActivityForResult(call, intent, "captured");
         } catch (ActivityNotFoundException e) {
-            discardCapture();
+            rememberCapture(false);
             call.reject("no camera app");
         }
     }
 
     @ActivityCallback
     private void captured(PluginCall call, ActivityResult result) {
-        if (call == null) return;
-        Uri uri = captureUri;
-        captureUri = null;
-        rememberCapture(null);
-        if (uri == null || result.getResultCode() != Activity.RESULT_OK) {
-            discard(uri);
+        if (call == null) return; // LifeLog was restarted meanwhile: load() picked the photo up
+        rememberCapture(false);
+        File file = captureFile();
+        if (result.getResultCode() != Activity.RESULT_OK) {
+            //noinspection ResultOfMethodCallIgnored
+            file.delete();
             call.resolve(photos(new JSArray()));
             return;
         }
-        publish(uri);
-        List<Uri> uris = new ArrayList<>();
-        uris.add(uri);
-        // Some camera apps report success without writing the photo: then nothing is imported; drop the empty entry.
-        importAll(call, uris, Build.VERSION.SDK_INT >= 29, () -> discard(uri));
-    }
-
-    private void discardCapture() {
-        discard(captureUri);
-        captureUri = null;
-        rememberCapture(null);
-    }
-
-    private void discard(Uri uri) {
-        if (uri != null && Build.VERSION.SDK_INT >= 29) {
-            try {
-                getContext().getContentResolver().delete(uri, null, null);
-            } catch (RuntimeException ignored) {
-                // Already gone.
-            }
+        if (file.length() == 0) {
+            call.reject("the camera app returned no photo");
+            return;
         }
+        importAll(call, new ArrayList<>(), false, file);
     }
 
     @PluginMethod
@@ -236,49 +196,87 @@ public class PhotosPlugin extends Plugin {
             uris = new ArrayList<>(shared);
             shared.clear();
         }
-        Uri restored = restoredCapture;
+        File restored = restoredCapture;
         restoredCapture = null;
-        // Access to shared photos ends with this visit, so they are not linked as originals; a restored camera
-        // photo is LifeLog's own entry in the gallery, so it is.
-        importAll(call, uris, false, null, restored);
+        // Access to shared photos ends with this visit, so they are not linked as originals.
+        importAll(call, uris, false, restored);
     }
 
     private void importAll(PluginCall call, List<Uri> uris, boolean linkOriginal) {
-        importAll(call, uris, linkOriginal, null, null);
+        importAll(call, uris, linkOriginal, null);
     }
 
-    private void importAll(PluginCall call, List<Uri> uris, boolean linkOriginal, Runnable nothingImported) {
-        importAll(call, uris, linkOriginal, nothingImported, null);
-    }
-
-    private void importAll(PluginCall call, List<Uri> uris, boolean linkOriginal, Runnable nothingImported, Uri ownCapture) {
+    /** Imports the photos; `capture` is a camera photo in the cache, first added to the gallery (its original). */
+    private void importAll(PluginCall call, List<Uri> uris, boolean linkOriginal, File capture) {
         getBridge().execute(() -> {
             JSArray list = new JSArray();
+            String captureError = null;
             try {
                 File dir = mediaDir();
-                List<Uri> all = new ArrayList<>(uris);
-                if (ownCapture != null) all.add(ownCapture);
-                for (Uri uri : all) {
+                for (Uri uri : uris) {
                     try {
-                        PhotoImport.Result r = PhotoImport.run(getContext().getContentResolver(), uri, dir);
-                        JSObject photo = new JSObject();
-                        photo.put("file", r.file);
-                        if (r.taken != null) photo.put("taken", r.taken);
-                        photo.put("width", r.width);
-                        photo.put("height", r.height);
-                        if (r.path != null) photo.put("path", r.path);
-                        if (linkOriginal || uri == ownCapture) photo.put("uri", uri.toString());
-                        list.put(photo);
+                        list.put(describe(PhotoImport.run(getContext().getContentResolver(), uri, dir), linkOriginal ? uri : null));
                     } catch (IOException | RuntimeException e) {
                         // One unreadable photo does not stop the others.
                     }
                 }
-                if (list.length() == 0 && nothingImported != null) nothingImported.run();
-                call.resolve(photos(list));
+                if (capture != null) {
+                    try {
+                        Uri original = Build.VERSION.SDK_INT >= 29 ? addToGallery(capture, null, 0) : null;
+                        Uri source = original != null ? original : Uri.fromFile(capture);
+                        list.put(describe(PhotoImport.run(getContext().getContentResolver(), source, dir), original));
+                    } catch (IOException | RuntimeException e) {
+                        captureError = e.getMessage();
+                    } finally {
+                        //noinspection ResultOfMethodCallIgnored
+                        capture.delete();
+                    }
+                }
+                if (list.length() == 0 && captureError != null) call.reject(captureError);
+                else call.resolve(photos(list));
             } catch (IOException e) {
                 call.reject(e.getMessage(), e);
             }
         });
+    }
+
+    private static JSObject describe(PhotoImport.Result r, Uri original) {
+        JSObject photo = new JSObject();
+        photo.put("file", r.file);
+        if (r.taken != null) photo.put("taken", r.taken);
+        photo.put("width", r.width);
+        photo.put("height", r.height);
+        if (r.path != null) photo.put("path", r.path);
+        if (original != null) photo.put("uri", original.toString());
+        return photo;
+    }
+
+    /** Adds a JPEG to the gallery's LifeLog album (Android 10+). The gallery reads its EXIF for the date taken. */
+    private Uri addToGallery(File jpeg, String name, long takenMs) throws IOException {
+        ContentResolver resolver = getContext().getContentResolver();
+        ContentValues values = new ContentValues();
+        String stamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.ROOT).format(new Date());
+        values.put(MediaStore.MediaColumns.DISPLAY_NAME, name != null ? name : "IMG_" + stamp + ".jpg");
+        values.put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg");
+        values.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/" + ALBUM);
+        if (takenMs > 0) values.put(MediaStore.Images.ImageColumns.DATE_TAKEN, takenMs);
+        values.put(MediaStore.MediaColumns.IS_PENDING, 1);
+        Uri target = resolver.insert(MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY), values);
+        if (target == null) throw new IOException("cannot add to the gallery");
+        try {
+            try (OutputStream out = resolver.openOutputStream(target); InputStream in = new FileInputStream(jpeg)) {
+                if (out == null) throw new IOException("cannot write to the gallery");
+                byte[] buffer = new byte[64 * 1024];
+                for (int n; (n = in.read(buffer)) > 0; ) out.write(buffer, 0, n);
+            }
+            ContentValues done = new ContentValues();
+            done.put(MediaStore.MediaColumns.IS_PENDING, 0);
+            resolver.update(target, done, null, null);
+            return target;
+        } catch (IOException | RuntimeException e) {
+            resolver.delete(target, null, null);
+            throw e;
+        }
     }
 
     private static JSObject photos(JSArray list) {
@@ -435,22 +433,7 @@ public class PhotosPlugin extends Plugin {
                         // Left to the gallery.
                     }
                 }
-                ContentResolver resolver = getContext().getContentResolver();
-                ContentValues values = new ContentValues();
-                values.put(MediaStore.MediaColumns.DISPLAY_NAME, "LifeLog_" + source.getName().substring(0, 12) + ".jpg");
-                values.put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg");
-                values.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/" + ALBUM);
-                if (takenMs > 0) values.put(MediaStore.Images.ImageColumns.DATE_TAKEN, takenMs);
-                values.put(MediaStore.MediaColumns.IS_PENDING, 1);
-                Uri target = resolver.insert(MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY), values);
-                if (target == null) throw new IOException("cannot add to the gallery");
-                try (OutputStream out = resolver.openOutputStream(target); InputStream in = new FileInputStream(jpeg)) {
-                    if (out == null) throw new IOException("cannot write to the gallery");
-                    out.write(readAll(in));
-                }
-                ContentValues done = new ContentValues();
-                done.put(MediaStore.MediaColumns.IS_PENDING, 0);
-                resolver.update(target, done, null, null);
+                addToGallery(jpeg, "LifeLog_" + source.getName().substring(0, 12) + ".jpg", takenMs);
                 call.resolve();
             } catch (IOException | RuntimeException e) {
                 call.reject(e.getMessage());
