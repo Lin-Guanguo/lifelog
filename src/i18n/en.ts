@@ -206,5 +206,5 @@ export default {
   'settings.photosSection': 'Photos',
   'settings.photosUsage': 'Photo copies',
   'settings.photosValue': '{n} · {size}',
-  'settings.photosHint': 'Photos in entries are kept as compressed copies (1600 px long side); the originals stay in the system gallery. Permanently deleting entries does not delete photo copies yet.',
+  'settings.photosHint': 'Photos in entries are kept as compressed copies (1600 px long side); the originals stay in the system gallery. Each sync deletes copies on this device that no entry uses any more (the server keeps its copies).',
 } satisfies Messages

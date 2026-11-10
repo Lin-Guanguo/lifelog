@@ -1,7 +1,7 @@
 # Photos in entries — design
 
 Built in 0.4.0; [docs/spec.md](../spec.md) → Photos describes what shipped. Not built from this note: deleting
-unreferenced copies (deferred), an optional "keep original" upload, a size limit for copies, iOS.
+copies on the server, an optional "keep original" upload, a size limit for copies, iOS.
 
 ## Storage
 
@@ -32,9 +32,9 @@ A photo is a line of its own, with a blank line around it:
 
 ## Lifecycle and sync
 
-- Deletion (deferred): a copy is needed while any non-purged row references it (trash included, so restore works).
-  Finding unreferenced copies means scanning every row, so it should run rarely (e.g. an explicit cleanup), not on
-  every purge or sync.
+- Deletion (0.4.1): a copy is needed while any non-purged row references it (trash included, so restore works).
+  Finding unreferenced copies scans every row, so it runs at sync (low frequency), on the snapshot being uploaded,
+  and deletes local copies only (older than a day); copies on the server are kept.
 - Upload copies **before** the database, so a synced database never references a missing file. An orphan sweep on
   WebDAV only removes files older than a few days (another device may be mid-sync).
 - Other devices download a copy when an entry is opened, and cache it.

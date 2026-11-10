@@ -1,6 +1,7 @@
 import { Capacitor } from '@capacitor/core'
 import { Preferences } from '@capacitor/preferences'
 import type { PhotoRef } from './content'
+import type { MediaFiles } from './files'
 import { nativePlatform } from './native'
 import type { PhotoPlatform } from './platform'
 import { webPlatform } from './web'
@@ -38,6 +39,15 @@ export function setPhotoDownload(fetch: typeof download): void {
 }
 
 const urls = new Map<string, Promise<string | null>>()
+
+// The copies, for sync; removing one also forgets its cached URL.
+export const photoFiles: MediaFiles = {
+  ...platform.files,
+  async remove(file) {
+    await platform.files.remove(file)
+    urls.delete(file)
+  },
+}
 
 // A URL to show the copy, downloading it first when needed; null when it cannot be had.
 export function photoUrl(file: string): Promise<string | null> {

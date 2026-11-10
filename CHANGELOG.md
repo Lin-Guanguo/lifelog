@@ -9,6 +9,8 @@ update dialog.
   writes into LifeLog, which adds the photo to the gallery (Pictures/LifeLog) itself; if a camera app still returns
   nothing, a message says so.
 - Entries from the last hour show seconds, under the time.
+- Each sync deletes photo copies on the phone that no entry uses any more (after a day's grace); copies on the
+  server stay.
 
 ## 0.4.0
 

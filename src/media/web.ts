@@ -27,18 +27,28 @@ async function tx<T>(mode: IDBTransactionMode, body: (store: IDBObjectStore) => 
 }
 
 const urls = new Map<string, string>()
+type Stored = { bytes: ArrayBuffer; modified: number }
+const get = (name: string) => tx<Stored | undefined>('readonly', (s) => s.get(name))
 
 const files: MediaFiles = {
-  list: async () => (await tx('readonly', (s) => s.getAllKeys())).map(String),
-  read: async (name) => new Uint8Array(await tx<ArrayBuffer>('readonly', (s) => s.get(name))),
+  async list() {
+    const [keys, values] = await Promise.all([tx('readonly', (s) => s.getAllKeys()), tx<Stored[]>('readonly', (s) => s.getAll())])
+    return keys.map((key, i) => ({ name: String(key), modified: values[i].modified }))
+  },
+  read: async (name) => new Uint8Array((await get(name))!.bytes),
   write: async (name, bytes) => {
-    await tx('readwrite', (s) => s.put(bytes.slice().buffer, name))
+    await tx('readwrite', (s) => s.put({ bytes: bytes.slice().buffer, modified: Date.now() } satisfies Stored, name))
+  },
+  async remove(name) {
+    await tx('readwrite', (s) => s.delete(name))
+    if (urls.has(name)) URL.revokeObjectURL(urls.get(name)!)
+    urls.delete(name)
   },
   async url(name) {
     if (!urls.has(name)) {
-      const buffer = await tx<ArrayBuffer | undefined>('readonly', (s) => s.get(name))
-      if (!buffer) return null
-      urls.set(name, URL.createObjectURL(new Blob([buffer], { type: contentType(name) })))
+      const stored = await get(name)
+      if (!stored) return null
+      urls.set(name, URL.createObjectURL(new Blob([stored.bytes], { type: contentType(name) })))
     }
     return urls.get(name)!
   },
@@ -108,10 +118,10 @@ async function download(name: string, type: string, bytes: Uint8Array) {
 export const webPlatform: PhotoPlatform = {
   files,
   async usage() {
-    const names = await files.list()
+    const list = await files.list()
     let bytes = 0
-    for (const name of names) bytes += (await files.read(name)).length
-    return { count: names.length, bytes }
+    for (const { name } of list) bytes += (await files.read(name)).length
+    return { count: list.length, bytes }
   },
   pick: async () => Promise.all((await choose({ multiple: true })).map(importFile)),
   capture: async () => Promise.all((await choose({ capture: true })).map(importFile)),

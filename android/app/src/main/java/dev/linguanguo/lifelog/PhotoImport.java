@@ -71,6 +71,9 @@ final class PhotoImport {
 
         File out = new File(mediaDir, result.file);
         if (!out.exists()) writeCopy(resolver, uri, bounds, orientation, out);
+        // Added again: counts as new, so cleanup at sync does not remove it before it is used.
+        else //noinspection ResultOfMethodCallIgnored
+            out.setLastModified(System.currentTimeMillis());
         return result;
     }
 

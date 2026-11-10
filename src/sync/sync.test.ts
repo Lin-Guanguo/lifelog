@@ -172,6 +172,32 @@ describe('sync', () => {
     expect(state.remoteVersion).toBeDefined()
   })
 
+  it('deletes local copies no row references, but not recent ones, and never on the server', async () => {
+    const photo = (c: string) => `${c.repeat(32)}.webp`
+    const day = 24 * 3_600_000
+    const now = Date.UTC(2026, 10, 12)
+    const files = memoryFiles({ [photo('a')]: [1], [photo('b')]: [2], [photo('d')]: [4] }, now - 2 * day)
+    files.add(photo('c'), now - 3_600_000) // added an hour ago, still in the composer's tray
+    const phone = await device()
+    const dav = createWebDav(CONFIG, transport())
+    await phone.add(`kept\n\n![](media/${photo('a')})`)
+    await phone.add(`trashed\n\n![](media/${photo('d')})`)
+    let { state } = await sync(dav, phone, {}, true, undefined, now, files)
+    expect(files.names()).toEqual([photo('a'), photo('c'), photo('d')]) // b: unused for two days
+    const uploaded = [...server.files.keys()].filter((k) => k.includes('/media/')).length
+    expect(uploaded).toBe(2) // a and d
+
+    // Permanently deleting the entry frees its photo at the next sync, even with nothing to upload.
+    const trashed = (await phone.listLive()).find((r) => r.content.startsWith('trashed'))!
+    await phone.trashEntries([trashed.entry_id])
+    ;({ state } = await sync(dav, phone, state, true, undefined, now, files))
+    expect(files.names()).toEqual([photo('a'), photo('c'), photo('d')]) // in the trash: still needed
+    await phone.purge((await phone.listTrash()).trashed.map((r) => r.id))
+    ;({ state } = await sync(dav, phone, state, false, undefined, now, files))
+    expect(files.names()).toEqual([photo('a'), photo('c')])
+    expect([...server.files.keys()].filter((k) => k.includes('/media/'))).toHaveLength(uploaded) // server untouched
+  })
+
   it('without photos it makes no extra requests', async () => {
     const phone = await device()
     await phone.add('text only')
@@ -192,12 +218,16 @@ describe('sync', () => {
   })
 })
 
-function memoryFiles(initial: Record<string, number[]>): MediaFiles {
-  const files = new Map<string, Uint8Array>(Object.entries(initial).map(([name, bytes]) => [name, new Uint8Array(bytes)]))
+function memoryFiles(initial: Record<string, number[]>, modified = 0): MediaFiles & { names: () => string[]; add: (name: string, at: number) => void } {
+  const files = new Map<string, { bytes: Uint8Array; modified: number }>(
+    Object.entries(initial).map(([name, bytes]) => [name, { bytes: new Uint8Array(bytes), modified }]))
   return {
-    list: async () => [...files.keys()],
-    read: async (name) => files.get(name)!,
-    write: async (name, bytes) => { files.set(name, bytes) },
+    list: async () => [...files].map(([name, f]) => ({ name, modified: f.modified })),
+    read: async (name) => files.get(name)!.bytes,
+    write: async (name, bytes) => { files.set(name, { bytes, modified: Date.now() }) },
+    remove: async (name) => { files.delete(name) },
     url: async (name) => (files.has(name) ? `memory:${name}` : null),
+    names: () => [...files.keys()].sort(),
+    add: (name, at) => { files.set(name, { bytes: new Uint8Array([0]), modified: at }) },
   }
 }

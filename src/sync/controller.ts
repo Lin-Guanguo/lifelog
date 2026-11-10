@@ -2,7 +2,7 @@ import { Capacitor } from '@capacitor/core'
 import { Preferences } from '@capacitor/preferences'
 import { reactive } from 'vue'
 import { NewerSchemaError } from '../data/schema'
-import { platform, setPhotoDownload } from '../media/photos'
+import { photoFiles, setPhotoDownload } from '../media/photos'
 import { t } from '../i18n'
 import { db, reloadLive } from '../store'
 import { platformTransport } from './http'
@@ -134,7 +134,7 @@ export function syncNow(): Promise<void> {
     let changesAtUpload = changes
     try {
       const result = await syncOnce(dav(settings), db(), sync.state, sync.dirty, () => { changesAtUpload = changes },
-        Date.now(), platform.files)
+        Date.now(), photoFiles)
       sync.state = result.state
       if (result.merged) await reloadLive()
       // Writes made after the snapshot was taken are still pending.

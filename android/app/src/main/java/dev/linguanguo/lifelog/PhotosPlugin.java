@@ -298,6 +298,7 @@ public class PhotosPlugin extends Plugin {
                     JSObject file = new JSObject();
                     file.put("name", f.getName());
                     file.put("size", f.length());
+                    file.put("modified", f.lastModified());
                     files.put(file);
                 }
             }
@@ -337,6 +338,17 @@ public class PhotosPlugin extends Plugin {
                 call.reject(e.getMessage(), e);
             }
         });
+    }
+
+    @PluginMethod
+    public void remove(PluginCall call) {
+        try {
+            File file = mediaFile(call);
+            if (file.exists() && !file.delete()) throw new IOException("cannot delete " + file.getName());
+            call.resolve();
+        } catch (IOException e) {
+            call.reject(e.getMessage(), e);
+        }
     }
 
     @PluginMethod

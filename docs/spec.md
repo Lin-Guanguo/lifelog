@@ -74,7 +74,10 @@ An entry's text may contain photo lines; nothing else about photos is stored (no
 - The original stays in the system gallery; LifeLog never moves, uploads or deletes it. Where it was found is
   remembered on this device only (Android content URI, never synced) for "open in gallery" and sharing it.
 - Copies live in the app's files (`media/`; IndexedDB in the browser build) and on the server in `<folder>/media/`.
-  Permanent deletion does not delete copies yet (cleanup needs a scan of every row; planned separately).
+  At each sync (automatic or manual), after merging, copies on this device that no row references any more
+  (permanently deleted, or removed in an edit and purged) are deleted, unless written in the last 24 hours (a photo
+  in the tray or an unsaved edit is not referenced yet; adding a photo again refreshes its date). The check uses the
+  same snapshot as the upload. Copies on the server are never deleted.
 
 Adding photos (Android, no permissions): the system photo picker (several at once), the system camera (one photo,
 saved to Pictures/LifeLog), or Share → LifeLog from another app. A quick send puts the text first and the photos after
@@ -159,6 +162,6 @@ Dates and durations use `Intl.DateTimeFormat` / `Intl.NumberFormat` with the act
 ## Not yet
 
 - iOS (needs iOS counterparts of the native WebDAV HTTP and Photos plugins; copies would be JPEG).
-- Deleting photo copies that no row references any more (locally and on the server).
+- Deleting photo copies on the server that no row references any more.
 - Pinch to zoom in the photo viewer.
 - Context lines around search matches.

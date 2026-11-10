@@ -19,9 +19,10 @@ interface PhotosPlugin {
   capture(): Promise<{ photos: NativePhoto[] }>
   takeShared(): Promise<{ photos: NativePhoto[] }>
   addListener(event: 'shared', listener: () => void): Promise<unknown>
-  list(): Promise<{ files: { name: string; size: number }[] }>
+  list(): Promise<{ files: { name: string; size: number; modified: number }[] }>
   read(options: { name: string }): Promise<{ data: string }>
   write(options: { name: string; data: string }): Promise<void>
+  remove(options: { name: string }): Promise<void>
   dir(): Promise<{ path: string }>
   hasOriginal(options: { uri: string; file: string }): Promise<{ value: boolean }>
   openOriginal(options: { uri: string }): Promise<void>
@@ -42,11 +43,15 @@ const known = () => (names ??= Photos.list().then(
 ))
 
 const files: MediaFiles = {
-  list: async () => [...await known()],
+  list: async () => (await Photos.list()).files.map(({ name, modified }) => ({ name, modified })),
   read: async (name) => fromBase64((await Photos.read({ name })).data),
   async write(name, bytes) {
     await Photos.write({ name, data: toBase64(bytes) })
     ;(await known()).add(name)
+  },
+  async remove(name) {
+    await Photos.remove({ name })
+    ;(await known()).delete(name)
   },
   async url(name) {
     if (!(await known()).has(name)) return null

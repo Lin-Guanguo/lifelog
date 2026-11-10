@@ -205,5 +205,5 @@ export default {
   'settings.photosSection': '照片',
   'settings.photosUsage': '照片副本',
   'settings.photosValue': '{n} 张 · {size}',
-  'settings.photosHint': '记录里的照片保存压缩副本（长边 1600 像素），原图留在系统相册。永久删除记录暂时不会删除照片副本。',
+  'settings.photosHint': '记录里的照片保存压缩副本（长边 1600 像素），原图留在系统相册。每次同步时，删除这台设备上不再被任何记录使用的照片副本（服务器上的保留）。',
 } as const
