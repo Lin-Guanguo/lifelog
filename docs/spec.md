@@ -140,6 +140,10 @@ JavaScript or have to fit in memory.
 
 - **Main**: chat-style stream, oldest at top, newest at the bottom above the composer; grouped by day; long text clamped to 3 lines.
   Entries from the last hour show seconds on a small line under HH:MM, so the time column keeps its width.
+  Entries with photos show up to four thumbnails ("+N" for the rest); tapping one opens the photo viewer on it, over
+  every photo in the log in timeline order (swiping continues into other entries); the entry's first line shows above
+  the time, and tapping it closes the viewer, scrolls the list to that entry (brief highlight) and opens its sheet.
+  Tapping elsewhere on an entry opens the sheet.
   - Tap: half-screen sheet with the full text and three icons stacked bottom-right (full screen, edit, delete with
     confirmation). Full screen expands the same sheet in place, keeping the icons; the first icon or back collapses it.
     Dragging the handle up expands, down collapses or closes.
@@ -150,7 +154,10 @@ JavaScript or have to fit in memory.
 - **Edit** (and **New entry**, from 排版): text fields and photo thumbnails, no formatting; camera / gallery insert at the
   cursor; long-press a photo to move it (the entry shrinks to an overview, the bottom bar becomes a remove zone).
   Explicit Save; leaving with changes (back arrow or Android back) asks Save / Discard / Keep editing. Unchanged text saves nothing.
-- **Photo viewer** (tap a photo in the sheet): full screen, swipe between photos; close and position on top. Below:
+- **Photo viewer** (tap a photo in the sheet): full screen, swipe between photos; close, position and ⓘ on top (ⓘ lists
+  what the photo line records: time with zone, camera, lens, settings, white balance, location, file). Pinch or
+  double-tap to zoom (up to 5×; zooming in loads the original; while zoomed, dragging pans instead of switching).
+  Swipe down (not zoomed) to close. Below:
   capture time, format and size, then four actions: 原图 (when the original is larger than the 1600 px display and
   not HEIC, loads it in place; otherwise 已是原图), 打开 (Android's open-with list: the gallery copy when exported, else
   LifeLog's file), 保存 (exports a copy to the gallery's LifeLog album as `LifeLog_<file>`, dated by the capture time,
@@ -179,5 +186,4 @@ Dates and durations use `Intl.DateTimeFormat` / `Intl.NumberFormat` with the act
 
 - iOS (needs iOS counterparts of the native WebDAV HTTP and Photos plugins; copies would be JPEG).
 - Deleting photo copies on the server that no row references any more.
-- Pinch to zoom in the photo viewer.
 - Context lines around search matches.

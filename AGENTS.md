@@ -15,7 +15,7 @@ pnpm --silent lifelog info --json   # what is there: counts, date range, schema 
 pnpm --silent lifelog list --from 2026-11-01 --to today --json
 pnpm --silent lifelog search 卧推 --json
 pnpm --silent lifelog sql "SELECT ..." --json   # anything else; changes are never saved
-pnpm --silent lifelog photos --json              # photo copies on the server vs. the photos entries reference
+pnpm --silent lifelog photos --json              # photo files on the server vs. the photos entries reference (incl. size check)
 pnpm --silent lifelog help
 ```
 

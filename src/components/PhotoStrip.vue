@@ -1,15 +1,18 @@
 <script setup lang="ts">
 import type { PhotoRef } from '../media/content'
+import { t } from '../i18n'
 import MediaImage from './MediaImage.vue'
 
-// An entry's photos in a list: up to four thumbnails, "+N" on the last for the rest.
+// An entry's photos in a list: up to four thumbnails, "+N" on the last for the rest. Tapping one opens it.
 defineProps<{ photos: PhotoRef[] }>()
+const emit = defineEmits<{ open: [index: number] }>()
 const SHOWN = 4
 </script>
 
 <template>
   <div class="strip">
-    <div v-for="(photo, i) in photos.slice(0, SHOWN)" :key="`${i}:${photo.file}`" class="thumb">
+    <div v-for="(photo, i) in photos.slice(0, SHOWN)" :key="`${i}:${photo.file}`" class="thumb" role="button" :aria-label="t('photo.alt')"
+      @click.stop="emit('open', i)">
       <MediaImage :photo="photo" />
       <span v-if="i === SHOWN - 1 && photos.length > SHOWN" class="more">+{{ photos.length - SHOWN + 1 }}</span>
     </div>

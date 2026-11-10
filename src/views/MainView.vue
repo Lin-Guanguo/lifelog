@@ -12,6 +12,7 @@ import AppIcon from '../components/AppIcon.vue'
 import EntrySheet from '../components/EntrySheet.vue'
 import MediaImage from '../components/MediaImage.vue'
 import PhotoStrip from '../components/PhotoStrip.vue'
+import PhotoViewer from '../components/PhotoViewer.vue'
 import { sync } from '../sync/controller'
 
 const LONG_PRESS_MS = 500
@@ -86,6 +87,40 @@ function onClick(record: LogRecord) {
   }
   if (selecting.value) toggle(record)
   else sheetRecord.value = record
+}
+
+// Tapping a thumbnail opens the viewer on it, over every photo in the log (oldest first), so swiping goes on into
+// other entries. Tapping elsewhere on the entry opens its sheet; in select mode a thumbnail selects too.
+const viewer = ref<number>()
+const allPhotos = computed(() => liveRecords.value.flatMap((r) => photosOf(r.content)))
+const photoEntries = computed(() => liveRecords.value.flatMap((r) => photosOf(r.content).map(() => r)))
+const flashed = ref<number>()
+
+// From the viewer to a photo's entry: close it, bring the entry into view with a brief highlight, open its sheet.
+async function showEntry(record: LogRecord) {
+  viewer.value = undefined
+  await nextTick()
+  list.value?.querySelector(`[data-entry="${record.entry_id}"]`)?.scrollIntoView({ block: 'start' })
+  flashed.value = record.entry_id
+  window.setTimeout(() => { if (flashed.value === record.entry_id) flashed.value = undefined }, 1500)
+  sheetRecord.value = record
+}
+const photoOffsets = computed(() => {
+  const offsets = new Map<number, number>()
+  let n = 0
+  for (const r of liveRecords.value) {
+    offsets.set(r.entry_id, n)
+    n += photosOf(r.content).length
+  }
+  return offsets
+})
+
+function onPhoto(record: LogRecord, index: number) {
+  if (longPressed || selecting.value) {
+    onClick(record)
+    return
+  }
+  viewer.value = (photoOffsets.value.get(record.entry_id) ?? 0) + index
 }
 
 async function deleteSelected() {
@@ -169,7 +204,8 @@ onMounted(scrollToBottom)
       <p v-if="liveRecords.length === 0" class="empty">{{ t('main.empty') }}</p>
       <section v-for="day in days" :key="day.key">
         <div class="daypill">{{ day.label }}</div>
-        <div v-for="record in day.rows" :key="record.id" class="entry" :class="{ selected: selected.has(record.entry_id) }"
+        <div v-for="record in day.rows" :key="record.id" class="entry" :data-entry="record.entry_id"
+          :class="{ selected: selected.has(record.entry_id), flash: flashed === record.entry_id }"
           role="button" tabindex="0"
           @pointerdown="onPointerDown($event, record)" @pointermove="onPointerMove" @pointerup="cancelPress"
           @pointercancel="cancelPress" @pointerleave="cancelPress" @contextmenu.prevent
@@ -178,7 +214,7 @@ onMounted(scrollToBottom)
           <time>{{ timeOf(record.logged_at) }}<small v-if="recent(record.logged_at)" class="sec">:{{ secondsOf(record.logged_at) }}</small></time>
           <div class="body">
             <p v-if="textOf(record.content)" class="text">{{ textOf(record.content) }}</p>
-            <PhotoStrip v-if="photosOf(record.content).length" :photos="photosOf(record.content)" />
+            <PhotoStrip v-if="photosOf(record.content).length" :photos="photosOf(record.content)" @open="(i) => onPhoto(record, i)" />
           </div>
         </div>
       </section>
@@ -216,6 +252,8 @@ onMounted(scrollToBottom)
     </div>
 
     <EntrySheet v-if="sheetRecord" :record="sheetRecord" @close="sheetRecord = undefined" />
+    <PhotoViewer v-if="viewer !== undefined" :photos="allPhotos" :entries="photoEntries" :start="viewer"
+      @close="viewer = undefined" @entry="showEntry" />
   </div>
 </template>
 
@@ -230,5 +268,7 @@ onMounted(scrollToBottom)
 .sync-chip.bad { color: var(--danger); }
 .stream { display: flex; flex-direction: column; }
 .entry .body { flex-grow: 1; min-width: 0; }
+.entry.flash { animation: flash 1.5s var(--ease); }
+@keyframes flash { 0%, 40% { background: var(--accent-soft); } 100% { background: transparent; } }
 .stream > :first-child { margin-top: auto; }
 </style>

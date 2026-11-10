@@ -3,6 +3,16 @@
 Each release's notes come from its section here (the release workflow requires one) and are shown in the app's
 update dialog.
 
+## 0.4.6
+
+- Photo viewer: pinch or double-tap to zoom (up to 5×); zooming in loads the full-resolution original. While zoomed,
+  dragging moves within the photo.
+- ⓘ in the viewer's top corner lists the photo's details: capture time, camera, lens, settings, location, file.
+- Tapping a photo in the list opens it right away; swiping goes on through the photos of other entries. Each photo
+  shows its entry's first line; tapping it goes to that entry in the list.
+- Swipe down to close the photo viewer.
+- Settings: the "remove sync settings" button is gone (easy to tap by mistake, not needed).
+
 ## 0.4.5
 
 - 🖼 is back to the system photo picker (the document picker was awkward to use). On some phones (HyperOS) it hands

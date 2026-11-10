@@ -106,7 +106,8 @@ async function capture(browser: Browser, theme: Theme) {
   flow('Photos', 'Under the input: camera, gallery and entry time on the left, 排版 (layout) on the right. Photos wait '
     + 'in a tray above the input; a quick send puts the text first and the photos after it. Photos from the gallery '
     + 'that are not from just now open a step that offers each photo’s capture time. In the list an entry shows up to '
-    + 'four thumbnails; the sheet lays photos out automatically by count; the viewer shows the original LifeLog keeps.')
+    + 'four thumbnails; tapping one opens the viewer over every photo in the log (tap elsewhere for the sheet); the sheet '
+    + 'lays photos out automatically by count; the viewer shows the original LifeLog keeps.')
   const morning = (h: number, m: number) => new Date(`2026-11-09T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00+08:00`)
   await choose(page, '从相册选择', [
     { name: 'IMG_0730.jpg', buffer: await jpeg(page, '#7fb2e5', morning(7, 30)) },
@@ -127,14 +128,30 @@ async function capture(browser: Browser, theme: Theme) {
   await page.getByRole('button', { name: '发送' }).click()
   await expect(entry('早上去江边').locator('.strip img')).toHaveCount(3)
   await shot('Entry with photos', 'Logged at the first photo’s time (07:30), so it sits before 08:12.')
-  await entry('早上去江边').click()
+  await entry('早上去江边').locator('.strip .thumb').nth(1).click()
+  await expect(page.locator('.entry-line')).toContainText('早上去江边')
+  await shot('Viewer from the list', 'Tapping a thumbnail opens the viewer on it, over every photo in the log: swipe on into '
+    + 'other entries. The entry’s first line sits above the time; tapping it closes the viewer, brings the entry into '
+    + 'view with a brief highlight and opens its sheet. Swipe down to close.')
+  await page.getByRole('button', { name: '关闭' }).click()
+  await entry('早上去江边').locator('.text').click()
   await expect(sheet.locator('.photo-group img')).toHaveCount(3)
   await shot('Sheet', 'Text, then the photos as one group: 1 keeps its shape (≤160 px tall), 2 side by side, '
     + '3 in a row, 4 as 2×2, 5+ in rows of three.')
   await sheet.locator('.tile').first().click()
-  await shot('Viewer', 'LifeLog keeps each photo’s original (private to the app, not in the system gallery). Below the '
-    + 'time, format and size: 原图 (the full-resolution original in place of the 1600 px display, when larger), 打开 '
-    + '(with another app), 保存 (a copy in the gallery’s LifeLog album, once; then 已在相册), 分享 (the original).')
+  await shot('Viewer', 'LifeLog keeps each photo’s original (private to the app, not in the system gallery). Top: close, '
+    + 'position, ⓘ. Below the time, format and size: 原图 (the full-resolution original in place of the 1600 px display, '
+    + 'when larger), 打开 (with another app), 保存 (a copy in the gallery’s LifeLog album, once; then 已在相册), 分享.')
+  await page.getByRole('button', { name: '照片信息' }).click()
+  await shot('Photo details', 'ⓘ: everything the photo line records (time with zone, camera, lens, settings, white balance, '
+    + 'location, file); only what is there. Tap outside or back to close.')
+  await page.locator('.details-scrim').click({ position: { x: 10, y: 10 } })
+  const stage = (await page.locator('.slide').first().boundingBox())!
+  await page.mouse.click(stage.x + stage.width * 0.6, stage.y + stage.height * 0.45)
+  await page.mouse.click(stage.x + stage.width * 0.6, stage.y + stage.height * 0.45)
+  await expect(page.locator('img.original')).toHaveCount(1)
+  await shot('Zoomed', 'Pinch or double-tap to zoom (up to 5×); zooming in loads the original. While zoomed, dragging moves '
+    + 'within the photo instead of switching photos; double-tap again to fit.')
   await page.getByRole('button', { name: '关闭' }).click()
   await sheet.getByRole('button', { name: '编辑' }).click()
   await expect(page.locator('.editor .thumb img')).toHaveCount(3)

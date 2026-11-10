@@ -57,7 +57,15 @@ test('photos: add, choose the time, lay out, view, sync', async ({ page, browser
   await page.getByRole('button', { name: '返回' }).click()
 
   // The sheet lays out text and the two photos as one group; the viewer shows the synced copy.
-  await entry.click()
+  // Tapping a thumbnail in the list opens the viewer right away, on that photo.
+  await entry.locator('.strip .thumb').nth(1).click()
+  const quick = page.getByRole('dialog', { name: '查看照片' })
+  await expect(quick).toContainText('2 / 2')
+  await quick.getByRole('button', { name: '关闭' }).click()
+  await expect(quick).toBeHidden()
+
+  // Tapping the entry elsewhere opens its sheet.
+  await entry.locator('.text').click()
   const sheet = page.getByRole('dialog', { name: '记录详情' })
   await expect(sheet.locator('.photo-group.two .tile')).toHaveCount(2)
   await sheet.locator('.tile').nth(1).click()
@@ -65,9 +73,44 @@ test('photos: add, choose the time, lay out, view, sync', async ({ page, browser
   await expect(viewer).toContainText('2 / 2')
   // LifeLog keeps the original: its format and size, byte for byte.
   await expect(viewer).toContainText(`JPEG · `)
-  // The 2400 px original is larger than the 1600 px display: 原图 loads it in place, then is done.
+  // ⓘ: what the photo line records.
+  await viewer.getByRole('button', { name: '照片信息' }).click()
+  const info = page.getByRole('dialog', { name: '照片信息' })
+  await expect(info).toContainText('拍摄时间')
+  await expect(info).toContainText('JPEG')
+  await expect(info).toContainText('2400 × 1800')
+  await page.locator('.details-scrim').click({ position: { x: 10, y: 10 } })
+  await expect(info).toHaveCount(0)
+
+  // Double-tap zooms in at that point and, as the 2400 px original is larger than the 1600 px display, loads it.
+  const current = viewer.locator('.slide').nth(1)
+  const box = (await current.boundingBox())!
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
+  await expect(current.locator('.zoom')).toHaveAttribute('style', /scale\(2\.5\)/)
+  await expect(current.locator('img.original')).toHaveCount(1)
+  await expect(viewer.getByRole('button', { name: '查看原图' })).toContainText('已是原图')
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
+  await expect(current.locator('.zoom')).toHaveAttribute('style', /scale\(1\)/)
+
+  // A two-finger pinch zooms too.
+  const cdp = await page.context().newCDPSession(page)
+  const cx = box.x + box.width / 2
+  const cy = box.y + box.height / 2
+  const touch = (type: string, d: number) => cdp.send('Input.dispatchTouchEvent', {
+    type, touchPoints: type === 'touchEnd' ? [] : [{ x: cx - d, y: cy, id: 1 }, { x: cx + d, y: cy, id: 2 }],
+  })
+  await touch('touchStart', 40)
+  for (const d of [60, 90, 120]) await touch('touchMove', d)
+  await touch('touchEnd', 0)
+  await expect(current.locator('.zoom')).toHaveAttribute('style', /scale\(3\)/)
+
+  // On the other photo, 原图 loads the original without zooming.
+  await viewer.locator('.track').evaluate((el) => el.scrollTo({ left: 0 }))
+  await expect(viewer).toContainText('1 / 2')
   await viewer.getByRole('button', { name: '查看原图' }).click()
-  await expect(viewer.locator('img.original')).toHaveCount(1)
+  await expect(viewer.locator('.slide').first().locator('img.original')).toHaveCount(1)
   await expect(viewer.getByRole('button', { name: '查看原图' })).toBeDisabled()
   await expect(viewer.getByRole('button', { name: '查看原图' })).toContainText('已是原图')
   await expect(viewer.getByRole('button', { name: '用其他应用打开' })).toBeVisible()
@@ -105,7 +148,7 @@ test('photos: add, choose the time, lay out, view, sync', async ({ page, browser
   await page.mouse.up()
   await expect(editor).not.toHaveClass(/arranging/)
   await page.getByRole('button', { name: '保存' }).click()
-  await entry.click()
+  await entry.locator('.text').click()
   await expect(sheet.locator('.entry-content > *').first()).toHaveClass(/photo-group/)
   await expect(sheet.locator('.photo-group')).toHaveCount(2)
   await page.locator('.scrim').click({ position: { x: 10, y: 10 } })
@@ -132,10 +175,40 @@ test('photos: add, choose the time, lay out, view, sync', async ({ page, browser
   await page.mouse.up()
   await expect(compose.locator('.thumb')).toHaveCount(1)
   await page.getByRole('button', { name: '发送' }).last().click()
-  await page.locator('.stream .entry', { hasText: '上午' }).click()
+  await page.locator('.stream .entry', { hasText: '上午' }).locator('.text').click()
   await expect(sheet.locator('.entry-content > *')).toHaveCount(3) // 上午, photo, 下午
   await expect(sheet.locator('.entry-content > *').nth(1)).toHaveClass(/photo-group one/)
   await page.locator('.scrim').click({ position: { x: 10, y: 10 } })
+
+  // From the list, the viewer spans the photos of every entry: swiping on goes into the next entry's photos.
+  await page.locator('.stream .entry', { hasText: '湖边走了一圈' }).locator('.strip .thumb').first().click()
+  const all = page.getByRole('dialog', { name: '查看照片' })
+  await expect(all).toContainText('1 / 3')
+  await expect(all.getByRole('button', { name: '查看这条记录' })).toContainText('湖边走了一圈')
+  await all.locator('.track').evaluate((el) => el.scrollTo({ left: el.clientWidth * 2 }))
+  await expect(all).toContainText('3 / 3')
+  await expect(all.getByRole('button', { name: '查看这条记录' })).toContainText('上午')
+
+  // Swipe down: a short drag springs back, a long one closes.
+  const stageBox = (await all.locator('.slide').nth(2).boundingBox())!
+  const drag = async (dy: number) => {
+    await page.mouse.move(stageBox.x + stageBox.width / 2, stageBox.y + 100)
+    await page.mouse.down()
+    await page.mouse.move(stageBox.x + stageBox.width / 2, stageBox.y + 100 + dy, { steps: 8 })
+    await page.mouse.up()
+  }
+  await drag(60)
+  await expect(all).toBeVisible()
+  await drag(220)
+  await expect(all).toBeHidden()
+
+  // The entry line under the time leads to that entry: the viewer closes and its sheet opens.
+  await page.locator('.stream .entry', { hasText: '湖边走了一圈' }).locator('.strip .thumb').first().click()
+  await all.getByRole('button', { name: '查看这条记录' }).click()
+  await expect(all).toBeHidden()
+  await expect(page.getByRole('dialog', { name: '记录详情' })).toContainText('湖边走了一圈')
+  await page.locator('.scrim').click({ position: { x: 10, y: 10 } })
+  await expect(page.getByRole('dialog', { name: '记录详情' })).toBeHidden()
 
   // Leaving the layout editor keeps paragraphs apart; the photos wait in the tray after the text.
   await page.getByRole('textbox', { name: '新记录' }).fill('甲\n乙')
