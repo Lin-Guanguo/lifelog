@@ -13,6 +13,8 @@ commands
   list                   entries in time order (default: the latest 50)
   search <text>          entries containing <text> (case-insensitive for ASCII)
   sql "<query>"          run SQL against the local file; changes are never saved
+  photos                 photo copies on the server (<directory>/media/) against the photos entries reference
+                         in the local file (pull first): referenced, missing on the server, not referenced
 
 options
   --db <path>            local SQLite file to read, or to write with pull (default .data/lifelog.sqlite)
@@ -61,6 +63,41 @@ function webdav() {
     auth: `Basic ${Buffer.from(`${env('LIFELOG_WEBDAV_USERNAME')}:${env('LIFELOG_WEBDAV_PASSWORD')}`).toString('base64')}`,
     directory: env('LIFELOG_WEBDAV_DIRECTORY', 'lifelog'),
   }
+}
+
+// Photo lines in entry text: ![](media/<key>.webp "…") (docs/spec.md → Photos).
+const PHOTO = /^!\[[^\]]*\]\(media\/([0-9a-f]{32}\.(?:webp|jpg))(?: "(?:[^"\\]|\\.)*")?\)$/gm
+
+async function photos() {
+  const db = await open()
+  const hasPurged = query(db, 'PRAGMA table_info(records)').some((c) => c.name === 'purged_at')
+  const rows = query(db, `SELECT content, deleted_at FROM records WHERE ${hasPurged ? 'purged_at IS NULL' : '1'} AND content LIKE '%](media/%'`)
+  const live = new Set()
+  const trash = new Set()
+  for (const r of rows) for (const [, file] of String(r.content).matchAll(PHOTO)) (r.deleted_at === null ? live : trash).add(file)
+
+  const { url, auth, directory } = webdav()
+  const folder = url + [...directory.split('/').filter(Boolean), 'media'].map(encodeURIComponent).join('/') + '/'
+  const res = await fetch(folder, { method: 'PROPFIND', headers: { Authorization: auth, Depth: '1' } })
+  if (res.status === 401 || res.status === 403) throw new Error(`authentication failed (HTTP ${res.status})`)
+  if (res.status !== 207 && res.status !== 404) throw new Error(`PROPFIND ${folder} → HTTP ${res.status}`)
+  const remote = res.status === 404 ? [] : [...(await res.text()).matchAll(/<(?:[\w-]+:)?href>([^<]*)<\/(?:[\w-]+:)?href>/gi)]
+    .map((m) => decodeURIComponent(m[1].replace(/\/+$/, '').split('/').pop() ?? ''))
+    .filter((name) => /^[0-9a-f]{32}\.(webp|jpg)$/.test(name))
+  const onServer = new Set(remote)
+  const referenced = new Set([...live, ...trash])
+  const result = {
+    folder,
+    onServer: onServer.size,
+    referencedByEntries: live.size,
+    referencedOnlyByTrash: [...trash].filter((f) => !live.has(f)).length,
+    missingOnServer: [...referenced].filter((f) => !onServer.has(f)),
+    notReferenced: [...onServer].filter((f) => !referenced.has(f)),
+  }
+  print(result, () => `${folder}\n${result.onServer} on the server; entries reference ${result.referencedByEntries}`
+    + ` (+${result.referencedOnlyByTrash} only from the trash)\nmissing on the server: ${result.missingOnServer.length}`
+    + `${result.missingOnServer.map((f) => `\n  ${f}`).join('')}\nnot referenced: ${result.notReferenced.length}`
+    + `${result.notReferenced.map((f) => `\n  ${f}`).join('')}`)
 }
 
 async function pull() {
@@ -165,6 +202,8 @@ async function main() {
     case 'search':
       if (!args[0]) throw new Error('search needs text: pnpm --silent lifelog search 卧推')
       return entries(await open(), args[0])
+    case 'photos':
+      return photos()
     case 'sql': {
       if (!args[0]) throw new Error('sql needs a query')
       const rows = query(await open(), args[0])
