@@ -10,17 +10,17 @@ When asked to look at, analyze or summarize the owner's log, use `scripts/lifelo
 WebDAV server by other means and never write to it.
 
 ```bash
-pnpm --silent lifelog pull          # fetch the latest synced file → .data/lifelog.sqlite
-pnpm --silent lifelog info --json   # what is there: counts, date range, schema version
+pnpm --silent lifelog sync          # mirror the WebDAV folder → data/ (lifelog.sqlite, media/); queries do this first
+pnpm --silent lifelog info --json   # what is there: counts, date range, schema version, photo files
 pnpm --silent lifelog list --from 2026-11-01 --to today --json
-pnpm --silent lifelog search 卧推 --json
+pnpm --silent lifelog list 卧推 --json             # entries containing the text
 pnpm --silent lifelog sql "SELECT ..." --json   # anything else; changes are never saved
-pnpm --silent lifelog photos --json              # photo files on the server vs. the photos entries reference (incl. size check)
+pnpm --silent lifelog photos --json              # photo files vs. the photos entries reference (missing, unreferenced, size check)
 pnpm --silent lifelog help
 ```
 
-- `pull` needs `.env` (keys in `.env.example`). If it is missing, ask the owner; never invent credentials.
-- Pull first when freshness matters; `info` shows when the local copy was fetched.
+- Syncing needs `.env` (keys in `.env.example`). If it is missing, ask the owner; never invent credentials.
+  Without it (or offline) queries fall back to the local copy with a note on stderr; `--offline` skips syncing.
 - Use `--silent` (not `-s`) or `node scripts/lifelog.mjs` so `--json` output parses.
 - Data model: one row per saved text in `records`, with integer ids (time-ordered; `entry_id` = id of the
   entry's first row). Rows with the same `entry_id` are one entry and its edits;
@@ -30,8 +30,9 @@ pnpm --silent lifelog help
   unchanged by edits. Analyze live rows unless asked.
 - Photos appear in `content` as lines `![](media/<key>.<ext> "taken=… size=… model=… gps=lat,lon … format=… bytes=…")`
   (docs/spec.md → Photos lists the fields; `%20` = space); treat them as photo references and facts, not text.
-  The files on WebDAV (`media/`) are the photos' originals; the CLI does not download them.
-- The log is private: don't commit `.env` or `.data/`, and don't send its contents to outside services.
+  The files on WebDAV (`media/`) are the photos' originals; sync mirrors them, so a line's `media/<key>.<ext>`
+  is the local file `data/media/<key>.<ext>` (open it to look at the photo).
+- The log is private: don't commit `.env` or `data/`, and don't send its contents to outside services.
 
 ## Development
 

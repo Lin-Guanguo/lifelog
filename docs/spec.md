@@ -57,7 +57,7 @@ Shipped migrations are never edited; changes are new migrations.
 
 Purged text is gone from the database (`PRAGMA secure_delete` overwrites the freed bytes) and from every later
 upload. Older uploads may survive in the WebDAV server's own file history (Nutstore 历史版本) and in copies
-pulled with `scripts/lifelog.mjs` until the next pull. Tombstones are kept forever: dropping them would let a
+synced with `scripts/lifelog.mjs` until the next sync. Tombstones are kept forever: dropping them would let a
 device that still has the text bring it back; they are tiny.
 
 Settings (retention, language, sync) live in Capacitor Preferences, not in the table.

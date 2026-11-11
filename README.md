@@ -80,17 +80,18 @@ gh release edit vX.Y.Z --prerelease=false --latest
 
 ## Read the data on a computer
 
-The app syncs a standard SQLite file to `<folder>/lifelog.sqlite` on WebDAV. `scripts/lifelog.mjs` fetches
-and queries it. Copy `.env.example` to `.env` (ignored by git) and fill in the same server, user, app
-password and folder, then:
+The app syncs a standard SQLite file to `<folder>/lifelog.sqlite` and photos to `<folder>/media/` on WebDAV.
+`scripts/lifelog.mjs` mirrors that folder into `data/` (ignored by git; same layout, photos downloaded once)
+and queries it; every query syncs first. Copy `.env.example` to `.env` (ignored by git) and fill in the same
+server, user, app password and folder, then:
 
 ```bash
-pnpm --silent lifelog pull                    # → .data/lifelog.sqlite (ignored by git)
+pnpm --silent lifelog sync                    # → data/lifelog.sqlite, data/media/
 pnpm --silent lifelog info
 pnpm --silent lifelog list --from 2026-11-01 --to today
-pnpm --silent lifelog search 卧推 --json
+pnpm --silent lifelog list 卧推 --json
 pnpm --silent lifelog sql "SELECT COUNT(*) FROM records"
-pnpm --silent lifelog help                    # all commands and options (--db, --out, --remote, …)
+pnpm --silent lifelog help                    # all commands and options (--dir, --offline, …)
 ```
 
 Use `--silent` (not `-s`) or `node scripts/lifelog.mjs …` so stdout carries only the output.

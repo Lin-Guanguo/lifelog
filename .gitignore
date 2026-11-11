@@ -21,11 +21,12 @@ docs/design/ui.html
 *.p12
 *.mobileprovision
 
-# Local secrets and data (see .env.example, scripts/backup.mjs)
+# Local secrets and data (see .env.example; data/ is the scripts/lifelog.mjs mirror)
 .env
 .env.*
 !.env.example
 .data/
+data/
 
 # Editors
 *.local
