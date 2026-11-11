@@ -2,7 +2,6 @@ import { ref } from 'vue'
 import type { LogRecord, Records } from './data/records'
 
 let records: Records
-export const liveRecords = ref<LogRecord[]>([])
 export const retentionHours = ref(7 * 24) // 0 = never clear
 
 export function setRecords(r: Records): void {
@@ -13,15 +12,25 @@ export function db(): Records {
   return records
 }
 
-export async function reloadLive(): Promise<void> {
-  liveRecords.value = await records.listLive()
+// Set anew whenever the log changes (an entry added, edited, deleted, restored, or merged by sync): views holding rows
+// (the main list's window, search results) read them again. `show` says what the main list shows then: by default
+// the same entries; after sending, the newest (written now) or the new entry located (written at an earlier time).
+export type Show = 'latest' | { locate: number }
+export const logVersion = ref<{ seq: number; show?: Show }>({ seq: 0 })
+
+export function logChanged(show?: Show): void {
+  logVersion.value = { seq: logVersion.value.seq + 1, show }
+}
+
+export function sent(entryId: number, earlier: boolean): void {
+  logChanged(earlier ? { locate: entryId } : 'latest')
 }
 
 export type Screen =
   | { name: 'search' }
   | { name: 'settings' }
   | { name: 'trash' }
-  | { name: 'edit'; entryId: number }
+  | { name: 'edit'; record: LogRecord } // the entry's text when editing started
   | { name: 'compose' } // the draft in the layout editor
 
 // Screens stacked over the always-mounted main log.

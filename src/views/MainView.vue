@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { pushBackHandler } from '../back'
 import { chooseTime, clearDraft, draft, importPhotos, isOld, offerPhotoTimes } from '../compose'
 import type { LogRecord } from '../data/records'
@@ -7,8 +7,8 @@ import { groupByDay, logTime, secondsOf, timeOf } from '../format'
 import { t } from '../i18n'
 import { composeContent, photosOf, takenAt, textOf, type PhotoRef } from '../media/content'
 import type { PhotoSource } from '../media/photos'
-import { db, liveRecords, locateRequest, openScreen, reloadLive, screens } from '../store'
-import { around, EDGE_PX, extendDown, extendUp, follow, JUMP_PX, newest, type Range } from '../timeline'
+import { db, locateRequest, logChanged, logVersion, openScreen, screens, sent } from '../store'
+import { around, EDGE_PX, EMPTY, extendDown, extendUp, JUMP_PX, newest, refresh, type Window } from '../timeline'
 import AppIcon from '../components/AppIcon.vue'
 import EntrySheet from '../components/EntrySheet.vue'
 import MediaImage from '../components/MediaImage.vue'
@@ -24,12 +24,13 @@ const list = ref<HTMLElement>()
 const sheetRecord = ref<LogRecord>()
 const selected = ref(new Set<number>())
 const selecting = computed(() => selected.value.size > 0)
-// The list draws a window of the log (timeline.ts); scrolling near an edge extends it there.
-const range = ref<Range>(newest(liveRecords.value.length))
-const drawn = computed(() => liveRecords.value.slice(range.value.start, range.value.end))
+// The list holds a window of the log, read in pages (timeline.ts); scrolling near an edge reads the next page there.
+const win = shallowRef<Window>(EMPTY)
+const loaded = ref(false)
+const drawn = computed(() => win.value.rows)
 const days = computed(() => groupByDay(drawn.value))
-watch(liveRecords, (after, before) => { range.value = follow(range.value, before, after) })
-const allSelected = computed(() => selected.value.size === liveRecords.value.length)
+const liveCount = ref(0) // for select all: counted when selecting starts, and on changes while selecting
+const allSelected = computed(() => liveCount.value > 0 && selected.value.size === liveCount.value)
 const syncChip = computed(() => {
   if (!sync.settings) return null
   if (sync.status === 'syncing') return { tone: '', label: t('sync.chipSyncing') }
@@ -55,8 +56,9 @@ function toggle(record: LogRecord) {
   selected.value = next
 }
 
-function toggleAll() {
-  selected.value = allSelected.value ? new Set() : new Set(liveRecords.value.map((r) => r.entry_id))
+// Every entry in the log, drawn or not.
+async function toggleAll() {
+  selected.value = allSelected.value ? new Set() : new Set(await db().liveEntryIds())
 }
 
 let pressTimer: number | undefined
@@ -94,15 +96,15 @@ function onClick(record: LogRecord) {
   else sheetRecord.value = record
 }
 
-// Tapping a thumbnail opens the viewer on it, over every photo in the log (oldest first), so swiping goes on into
+// Tapping a thumbnail opens the viewer on it, over every photo in the window (oldest first), so swiping goes on into
 // other entries. Tapping elsewhere on the entry opens its sheet; in select mode a thumbnail selects too.
 const viewer = ref<number>()
-// Every photo in the log, for the viewer, in one pass over it: each photo's entry, and where each entry's photos start.
+// Every photo in the window, for the viewer, in one pass: each photo's entry, and where each entry's photos start.
 const photoIndex = computed(() => {
   const photos: PhotoRef[] = []
   const entries: LogRecord[] = []
   const offsets = new Map<number, number>()
-  for (const r of liveRecords.value) {
+  for (const r of drawn.value) {
     offsets.set(r.entry_id, photos.length)
     for (const photo of photosOf(r.content)) {
       photos.push(photo)
@@ -115,67 +117,108 @@ const photoIndex = computed(() => {
 // The viewer's entry line opens that entry's sheet over the viewer. The viewer closes when an entry is edited (the
 // editor opens) or the log changes under it (its photos would shift).
 watch(() => screens.value.length, (n) => { if (n) viewer.value = undefined })
-watch(liveRecords, () => { viewer.value = undefined })
+watch(logVersion, () => { viewer.value = undefined })
 
 // ⌖ in a sheet (here, in search, over the viewer): everything on top closes, the entry is drawn and scrolled to the
 // middle, and stays highlighted until another is located or it leaves the drawn range.
 const located = ref<number>()
-watch(locateRequest, async (request) => {
-  if (!request) return
+// `fresh`: the log just changed, so the window is read around the entry even if it was loaded.
+async function locate(id: number, fresh = false) {
   viewer.value = undefined
   sheetRecord.value = undefined
-  const index = liveRecords.value.findIndex((r) => r.entry_id === request.entryId)
-  if (index < 0) return
-  if (index < range.value.start || index >= range.value.end) range.value = around(index, liveRecords.value.length)
-  located.value = request.entryId
+  await change(async (w) => {
+    if (!fresh && w.rows.some((r) => r.entry_id === id)) return w
+    return (await around(db(), id)) ?? (fresh ? refresh(db(), w) : w) // gone meanwhile: the change is still read
+  }, false)
+  if (!drawn.value.some((r) => r.entry_id === id)) return
+  located.value = id
   await nextTick()
-  list.value?.querySelector(`[data-entry="${request.entryId}"]`)?.scrollIntoView({ block: 'center' })
-})
+  list.value?.querySelector(`[data-entry="${id}"]`)?.scrollIntoView({ block: 'center' })
+}
+watch(locateRequest, (request) => { if (request) void locate(request.entryId) })
 watch(drawn, (rows) => {
   if (located.value !== undefined && !rows.some((r) => r.entry_id === located.value)) located.value = undefined
 })
 
-// Extending the window keeps what is on screen where it is: an entry that stays drawn is measured before and after.
-let adjusting = false
-async function extend(next: Range, anchorId: number | undefined) {
-  const el = list.value!
-  const anchor = () => (anchorId === undefined ? null : el.querySelector<HTMLElement>(`[data-entry="${anchorId}"]`))
-  const top = anchor()?.getBoundingClientRect().top
-  adjusting = true
-  range.value = next
-  await nextTick()
-  const after = anchor()?.getBoundingClientRect().top
-  if (top !== undefined && after !== undefined) el.scrollTop += after - top
-  adjusting = false
+// Window changes run one at a time, in order (e.g. a page read while scrolling, then the read after a sync merged).
+// Unless the caller scrolls itself, what is on screen stays put: the first entry in view is measured before and after.
+let queue = Promise.resolve()
+let changing = 0
+function change(next: (w: Window) => Promise<Window | undefined>, keepView = true): Promise<void> {
+  changing++
+  const run = queue.then(async () => {
+    const anchor = keepView ? firstInView() : undefined
+    const w = await next(win.value)
+    if (w && w !== win.value) {
+      win.value = w
+      await nextTick()
+      if (anchor) {
+        const el = list.value?.querySelector<HTMLElement>(`[data-entry="${anchor.id}"]`)
+        if (el) list.value!.scrollTop += el.getBoundingClientRect().top - anchor.top
+      }
+    }
+    updateFarFromLatest()
+  }).finally(() => {
+    changing--
+    window.setTimeout(onListScroll) // the new window may itself end near the screen (a short log, a big change)
+  })
+  queue = run.catch(() => {})
+  return run
 }
 
-// The jump-to-latest button shows while the newest entries are not drawn, or more than JUMP_PX of the list is below.
+function firstInView(): { id: number; top: number } | undefined {
+  const el = list.value
+  if (!el) return undefined
+  const entries = el.querySelectorAll<HTMLElement>('.entry')
+  const top = el.getBoundingClientRect().top
+  let lo = 0
+  let hi = entries.length // entries are in time order, top to bottom
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1
+    if (entries[mid].getBoundingClientRect().bottom <= top) lo = mid + 1
+    else hi = mid
+  }
+  const first = entries[lo]
+  return first ? { id: Number(first.dataset.entry), top: first.getBoundingClientRect().top } : undefined
+}
+
+// The log changed: one read of the window, as `show` says (see store.ts). By default the same entries are read again;
+// the first entries (e.g. a fresh install's first sync) show from the newest, at the bottom.
+watch(logVersion, async ({ show }) => {
+  if (show === 'latest') await toLatest()
+  else if (show) await locate(show.locate, true)
+  else {
+    const wasEmpty = drawn.value.length === 0
+    await change((w) => refresh(db(), w), !wasEmpty)
+    if (wasEmpty) await scrollToBottom()
+  }
+  if (selecting.value) liveCount.value = await db().countLive()
+})
+watch(selecting, async (on) => { if (on) liveCount.value = await db().countLive() })
+
+// The jump-to-latest button shows while the newest entries are not in the window, or more than JUMP_PX is below.
 const farFromLatest = ref(false)
 function updateFarFromLatest() {
   const el = list.value
   if (!el) return
   const below = el.scrollHeight - el.scrollTop - el.clientHeight
-  farFromLatest.value = range.value.end < liveRecords.value.length || below > JUMP_PX
+  farFromLatest.value = win.value.newer || below > JUMP_PX
 }
-watch(range, async () => { await nextTick(); updateFarFromLatest() })
-async function onListScroll() {
+function onListScroll() {
   const el = list.value
   if (!el) return
   updateFarFromLatest()
+  if (changing) return
   const below = el.scrollHeight - el.scrollTop - el.clientHeight
-  if (adjusting) return
-  const rows = drawn.value
-  if (el.scrollTop < EDGE_PX && range.value.start > 0) await extend(extendUp(range.value), rows[0]?.entry_id)
-  else if (below < EDGE_PX && range.value.end < liveRecords.value.length) {
-    await extend(extendDown(range.value, liveRecords.value.length), rows[rows.length - 1]?.entry_id)
-  }
+  if (el.scrollTop < EDGE_PX && win.value.older) void change((w) => extendUp(db(), w))
+  else if (below < EDGE_PX && win.value.newer) void change((w) => extendDown(db(), w))
 }
 
 // Bottom-left button when far from the newest entries: back to them (a located entry out of range loses its highlight).
 async function toLatest() {
-  range.value = newest(liveRecords.value.length)
-  farFromLatest.value = false
+  await change(() => newest(db()), false)
   await scrollToBottom()
+  updateFarFromLatest()
 }
 
 function onPhoto(record: LogRecord, index: number) {
@@ -189,7 +232,7 @@ function onPhoto(record: LogRecord, index: number) {
 async function deleteSelected() {
   await db().trashEntries([...selected.value])
   clearSelection()
-  await reloadLive()
+  logChanged()
 }
 
 function resizeComposer() {
@@ -209,13 +252,12 @@ const canSend = computed(() => draft.text.trim() !== '' || draft.photos.length >
 // The text first, then the photos as one group; at the chosen time if one was set.
 async function send() {
   if (!canSend.value) return
-  await db().add(composeContent(draft.text.trim(), draft.photos), draft.time ?? undefined)
   const earlier = draft.time !== null
+  const id = await db().add(composeContent(draft.text.trim(), draft.photos), draft.time ?? undefined)
   clearDraft()
   await nextTick()
   resizeComposer()
-  await reloadLive()
-  if (!earlier) await toLatest()
+  sent(id, earlier)
 }
 
 async function addPhotos(source: PhotoSource) {
@@ -235,9 +277,13 @@ const recent = (ms: number) => now.value - ms < RECENT_MS
 let clock: number | undefined
 onMounted(() => { clock = window.setInterval(() => { now.value = Date.now() }, 30_000) })
 onUnmounted(() => window.clearInterval(clock))
-watch(liveRecords, () => { now.value = Date.now() })
+watch(logVersion, () => { now.value = Date.now() })
 
-onMounted(scrollToBottom)
+onMounted(async () => {
+  await change(() => newest(db()), false)
+  loaded.value = true
+  await scrollToBottom()
+})
 </script>
 
 <template>
@@ -265,7 +311,7 @@ onMounted(scrollToBottom)
 
     <div class="list-wrap">
       <main ref="list" class="scroll stream" @scroll.passive="onListScroll">
-        <p v-if="liveRecords.length === 0" class="empty">{{ t('main.empty') }}</p>
+        <p v-if="loaded && drawn.length === 0" class="empty">{{ t('main.empty') }}</p>
         <section v-for="day in days" :key="day.key">
           <div class="daypill">{{ day.label }}</div>
           <div v-for="record in day.rows" :key="record.id" class="entry" :data-entry="record.entry_id"

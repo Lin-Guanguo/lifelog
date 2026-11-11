@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useBackHandler } from '../back'
-import { timeLeft, type LogRecord } from '../data/records'
+import { RESULT_LIMIT, timeLeft, type LogRecord } from '../data/records'
 import { dateOf, formatRemaining, formatHours, timeOf } from '../format'
 import { t } from '../i18n'
-import { closeScreen, db, reloadLive, retentionHours } from '../store'
+import { closeScreen, db, logChanged, retentionHours } from '../store'
 import AppIcon from '../components/AppIcon.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import HighlightText from '../components/HighlightText.vue'
@@ -19,6 +19,7 @@ interface Group {
 
 const query = ref('')
 const trashed = ref<LogRecord[]>([])
+const more = ref(false) // more in the trash (or matching) than are shown
 const live = ref<LogRecord[]>([])
 const selected = ref(new Set<number>())
 const dialog = ref<'overwrite' | 'purge'>()
@@ -47,6 +48,7 @@ async function load() {
   const result = await db().listTrash(query.value.trim())
   trashed.value = result.trashed
   live.value = result.live
+  more.value = result.more
   const visible = new Set(result.trashed.map((r) => r.id))
   selected.value = new Set([...selected.value].filter((id) => visible.has(id)))
 }
@@ -102,7 +104,8 @@ async function restore() {
   dialog.value = undefined
   await db().restore(selectedRows.value)
   selected.value = new Set()
-  await Promise.all([load(), reloadLive()])
+  logChanged()
+  await load()
 }
 
 async function purge() {
@@ -129,6 +132,7 @@ onMounted(load)
         <input v-model="query" type="search" enterkeyhint="search" :aria-label="t('trash.searchLabel')" :placeholder="t('trash.searchPlaceholder')">
       </div>
       <p class="hint">{{ retentionHours > 0 ? t('trash.retentionHint', { duration: formatHours(retentionHours) }) : t('trash.noCleanupHint') }}</p>
+      <p v-if="more" class="hint">{{ t('trash.limited', { n: RESULT_LIMIT }) }}</p>
       <p v-if="trashed.length === 0" class="empty">{{ query.trim() ? t('trash.noMatch') : t('trash.empty') }}</p>
 
       <section v-for="group in groups" :key="group.entryId" class="card group">

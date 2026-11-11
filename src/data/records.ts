@@ -29,6 +29,22 @@ export const HOUR_MS = 3_600_000
 export const DAY_MS = 24 * HOUR_MS
 
 const INSERT = 'INSERT INTO records (id, entry_id, logged_at, content, written_at) VALUES (?, ?, ?, ?, ?)'
+const LIVE = 'deleted_at IS NULL'
+// The timeline's order: when it happened, then the order written (ids grow with writing). Indexed for live rows.
+const OLDEST_FIRST = 'ORDER BY logged_at, id'
+const NEWEST_FIRST = 'ORDER BY logged_at DESC, id DESC'
+
+// Search and the trash list show at most this many rows (the newest); the main list loads pages (timeline.ts).
+export const RESULT_LIMIT = 500
+
+// A position in the timeline: the row's sort key.
+export type Cursor = Pick<LogRecord, 'logged_at' | 'id'>
+
+// Rows of a page in time order (oldest first), and whether more lie beyond it in the direction it was read.
+export interface Page {
+  rows: LogRecord[]
+  more: boolean
+}
 const IN_TRASH = 'deleted_at IS NOT NULL AND purged_at IS NULL'
 const PURGE = "UPDATE records SET content = '', purged_at = ?"
 
@@ -65,22 +81,56 @@ export function createRecords(
   }
 
   return {
+    // The whole live log, oldest first: for tests and tools; the app reads pages.
     listLive(): Promise<LogRecord[]> {
-      return select('SELECT * FROM records WHERE deleted_at IS NULL ORDER BY logged_at, written_at')
+      return select(`SELECT * FROM records WHERE ${LIVE} ${OLDEST_FIRST}`)
     },
 
-    async searchLive(query: string): Promise<LogRecord[]> {
-      return matchingText(await select(
-        "SELECT * FROM records WHERE deleted_at IS NULL AND content LIKE ? ESCAPE '!' ORDER BY logged_at DESC",
-        [likePattern(query)],
-      ), query)
+    // Pages of the live timeline. One row more than asked for tells whether more exist.
+    async newest(limit: number): Promise<Page> {
+      const rows = await select(`SELECT * FROM records WHERE ${LIVE} ${NEWEST_FIRST} LIMIT ?`, [limit + 1])
+      return { rows: rows.slice(0, limit).reverse(), more: rows.length > limit }
+    },
+    async before(cursor: Cursor, limit: number): Promise<Page> {
+      const rows = await select(`SELECT * FROM records WHERE ${LIVE} AND (logged_at, id) < (?, ?) ${NEWEST_FIRST} LIMIT ?`,
+        [cursor.logged_at, cursor.id, limit + 1])
+      return { rows: rows.slice(0, limit).reverse(), more: rows.length > limit }
+    },
+    // From the cursor (included when still live) on.
+    async from(cursor: Cursor, limit: number): Promise<Page> {
+      const rows = await select(`SELECT * FROM records WHERE ${LIVE} AND (logged_at, id) >= (?, ?) ${OLDEST_FIRST} LIMIT ?`,
+        [cursor.logged_at, cursor.id, limit + 1])
+      return { rows: rows.slice(0, limit), more: rows.length > limit }
+    },
+    async after(cursor: Cursor, limit: number): Promise<Page> {
+      const rows = await select(`SELECT * FROM records WHERE ${LIVE} AND (logged_at, id) > (?, ?) ${OLDEST_FIRST} LIMIT ?`,
+        [cursor.logged_at, cursor.id, limit + 1])
+      return { rows: rows.slice(0, limit), more: rows.length > limit }
     },
 
-    // loggedAt: when it happened, if not now (e.g. the time a photo was taken).
-    async add(content: string, loggedAt?: number): Promise<void> {
+    async getLive(entryId: number): Promise<LogRecord | undefined> {
+      return (await select(`SELECT * FROM records WHERE ${LIVE} AND entry_id = ?`, [entryId]))[0]
+    },
+    async liveEntryIds(): Promise<number[]> {
+      return (await db.query(`SELECT entry_id FROM records WHERE ${LIVE}`)).map((r) => Number(r.entry_id))
+    },
+    async countLive(): Promise<number> {
+      return Number((await db.query(`SELECT COUNT(*) AS n FROM records WHERE ${LIVE}`))[0]?.n ?? 0)
+    },
+
+    // The newest RESULT_LIMIT candidates, newest first; `more` when there were more.
+    async searchLive(query: string): Promise<Page> {
+      const rows = await select(`SELECT * FROM records WHERE ${LIVE} AND content LIKE ? ESCAPE '!' ${NEWEST_FIRST} LIMIT ?`,
+        [likePattern(query), RESULT_LIMIT + 1])
+      return { rows: matchingText(rows.slice(0, RESULT_LIMIT), query), more: rows.length > RESULT_LIMIT }
+    },
+
+    // loggedAt: when it happened, if not now (e.g. the time a photo was taken). Returns the new entry's id.
+    async add(content: string, loggedAt?: number): Promise<number> {
       const t = now()
       const id = await newId(t)
       await db.run([{ statement: INSERT, values: [id, id, loggedAt ?? t, content, t] }])
+      return id
     },
 
     async edit(current: LogRecord, content: string): Promise<void> {
@@ -100,16 +150,19 @@ export function createRecords(
     },
 
     // Trashed rows (optionally filtered) plus the live rows of the same entries, for reference.
-    async listTrash(query = ''): Promise<{ trashed: LogRecord[]; live: LogRecord[] }> {
-      const order = 'ORDER BY logged_at DESC, written_at DESC'
-      const trashed = query
-        ? matchingText(await select(`SELECT * FROM records WHERE ${IN_TRASH} AND content LIKE ? ESCAPE '!' ${order}`, [likePattern(query)]), query)
-        : await select(`SELECT * FROM records WHERE ${IN_TRASH} ${order}`)
+    // At most the newest RESULT_LIMIT (`more` when there were more).
+    async listTrash(query = ''): Promise<{ trashed: LogRecord[]; live: LogRecord[]; more: boolean }> {
+      const limit = `${NEWEST_FIRST} LIMIT ${RESULT_LIMIT + 1}`
+      const candidates = query
+        ? await select(`SELECT * FROM records WHERE ${IN_TRASH} AND content LIKE ? ESCAPE '!' ${limit}`, [likePattern(query)])
+        : await select(`SELECT * FROM records WHERE ${IN_TRASH} ${limit}`)
+      const more = candidates.length > RESULT_LIMIT
+      const trashed = query ? matchingText(candidates.slice(0, RESULT_LIMIT), query) : candidates.slice(0, RESULT_LIMIT)
       const entryIds = [...new Set(trashed.map((r) => r.entry_id))]
       const live = entryIds.length
         ? await select(`SELECT * FROM records WHERE deleted_at IS NULL AND entry_id IN (${placeholders(entryIds)})`, entryIds)
         : []
-      return { trashed, live }
+      return { trashed, live, more }
     },
 
     async countTrash(): Promise<number> {
@@ -145,7 +198,7 @@ export function createRecords(
 
     // Every row, including tombstones, for snapshots.
     all(): Promise<LogRecord[]> {
-      return select('SELECT * FROM records ORDER BY logged_at, written_at')
+      return select(`SELECT * FROM records ${OLDEST_FIRST}`)
     },
 
     // Merges another copy of the log; resolves to whether anything changed here. Rows are append-only
@@ -153,17 +206,20 @@ export function createRecords(
     // the earlier time when both are. If an entry ends up with two live texts (edited on two devices),
     // the later-written one stays live and the other is trashed as of that time, the same on every copy.
     async merge(remote: LogRecord[]): Promise<boolean> {
-      const rows = new Map((await select('SELECT * FROM records')).map((r) => [r.id, r]))
+      // Merging decides on these columns only; local texts are never read.
+      type Row = Pick<LogRecord, 'id' | 'entry_id' | 'written_at' | 'deleted_at' | 'purged_at'>
+      const here = (await db.query('SELECT id, entry_id, written_at, deleted_at, purged_at FROM records')) as unknown as Row[]
+      const rows = new Map(here.map((r) => [r.id, r]))
       const liveByEntry = new Map([...rows.values()].filter((r) => r.deleted_at === null).map((r) => [r.entry_id, r]))
       const statements: Statement[] = []
-      const update = (row: LogRecord, deletedAt: number | null, purgedAt: number | null) => {
+      const update = (row: Row, deletedAt: number | null, purgedAt: number | null) => {
         if (deletedAt === row.deleted_at && purgedAt === row.purged_at) return
         statements.push({
           statement: "UPDATE records SET deleted_at = ?, purged_at = ?, content = CASE WHEN ? IS NULL THEN content ELSE '' END WHERE id = ?",
           values: [deletedAt, purgedAt, purgedAt, row.id],
         })
         if (row.deleted_at === null && deletedAt !== null) liveByEntry.delete(row.entry_id)
-        rows.set(row.id, { ...row, deleted_at: deletedAt, purged_at: purgedAt, content: purgedAt === null ? row.content : '' })
+        rows.set(row.id, { ...row, deleted_at: deletedAt, purged_at: purgedAt })
       }
 
       // Rows known here first, so status changes are in place before new texts compete for live.

@@ -48,6 +48,7 @@ export default {
   'search.placeholder': '搜索全部记录',
   'search.prompt': '输入关键词，搜索全部记录。',
   'search.summary': '{n} 条匹配 · 最新在前',
+  'search.limited': '只显示最近的 {n} 条，输入更多字可缩小范围',
   'search.none': '没有匹配的记录。',
 
   'settings.title': '设置',
@@ -123,6 +124,7 @@ export default {
   'trash.searchPlaceholder': '搜索回收站里的内容',
   'trash.retentionHint': '删除{duration}后自动永久清除（可在设置中修改）。',
   'trash.noCleanupHint': '自动清除已关闭（可在设置中修改）。',
+  'trash.limited': '只显示最近的 {n} 条，搜索可找到更早的。',
   'trash.empty': '回收站是空的。',
   'trash.noMatch': '没有匹配的内容。',
   'trash.entryTitle': '{date} {time} 的记录',

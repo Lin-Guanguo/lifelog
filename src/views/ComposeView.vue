@@ -6,7 +6,7 @@ import { logTime } from '../format'
 import { t } from '../i18n'
 import { composeContent, parseContent, photosOf } from '../media/content'
 import type { PhotoSource } from '../media/photos'
-import { closeScreen, db, reloadLive } from '../store'
+import { closeScreen, db, sent } from '../store'
 import AppIcon from '../components/AppIcon.vue'
 import BlockEditor from '../components/BlockEditor.vue'
 
@@ -26,10 +26,11 @@ useBackHandler(leave)
 
 async function send() {
   if (!canSend.value) return
-  await db().add(content.value, draft.time ?? undefined)
+  const earlier = draft.time !== null
+  const id = await db().add(content.value, draft.time ?? undefined)
   clearDraft()
-  await reloadLive()
   closeScreen()
+  sent(id, earlier)
 }
 
 async function add(source: PhotoSource) {

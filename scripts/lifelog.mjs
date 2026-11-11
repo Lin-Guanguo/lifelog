@@ -199,7 +199,7 @@ function entries(db, contains) {
   // Without a range or explicit limit, show the latest 50.
   const limit = opt.limit ? Number(opt.limit) : opt.from || opt.to ? -1 : 50
   const rows = query(db, `SELECT * FROM (SELECT * FROM records WHERE ${where.join(' AND ')}
-    ORDER BY logged_at DESC, written_at DESC LIMIT ?) ORDER BY logged_at, written_at`, [...params, limit])
+    ORDER BY logged_at DESC, id DESC LIMIT ?) ORDER BY logged_at, id`, [...params, limit])
   print(rows.map((r) => ({ ...r, logged: localTime(r.logged_at), trashed: r.deleted_at !== null })),
     () => rows.map((r) => `${localTime(r.logged_at)}${r.deleted_at !== null ? ' [trash]' : ''}  ${String(r.content).replace(/\n/g, '\n                  ')}`).join('\n')
       || '(no entries)')

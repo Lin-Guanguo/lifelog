@@ -1,6 +1,6 @@
 import initSqlJs, { type Database } from 'sql.js'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { createRecords, DAY_MS, HOUR_MS, timeLeft, type Records } from './records'
+import { createRecords, DAY_MS, HOUR_MS, RESULT_LIMIT, timeLeft, type Records } from './records'
 import { migrate } from './schema'
 import { sqlJsExecutor } from './sqljs'
 
@@ -105,7 +105,7 @@ describe('records', () => {
     expect((await records.listTrash()).trashed.map((r) => r.content)).toEqual(['b'])
     // the row stays as a tombstone without its text
     expect((await records.all()).find((r) => r.id === a.id)).toMatchObject({ content: '', purged_at: clock })
-    expect(await records.searchLive('a')).toEqual([])
+    expect((await records.searchLive('a')).rows).toEqual([])
     // live rows are never purged
     await records.add('c')
     const [c] = await records.listLive()
@@ -143,9 +143,9 @@ describe('records', () => {
     const photo = `![](media/${'a'.repeat(32)}.webp "taken=2026-11-10T14:02:12+08:00 path=DCIM/Camera/IMG_1.jpg")`
     await records.add(`湖边\n\n${photo}`)
     await records.add('IMG 文件名')
-    expect((await records.searchLive('湖边')).map((r) => r.content)).toEqual([`湖边\n\n${photo}`])
-    for (const q of ['IMG', 'img']) expect((await records.searchLive(q)).map((r) => r.content)).toEqual(['IMG 文件名'])
-    expect(await records.searchLive('DCIM')).toEqual([])
+    expect((await records.searchLive('湖边')).rows.map((r) => r.content)).toEqual([`湖边\n\n${photo}`])
+    for (const q of ['IMG', 'img']) expect((await records.searchLive(q)).rows.map((r) => r.content)).toEqual(['IMG 文件名'])
+    expect((await records.searchLive('DCIM')).rows).toEqual([])
     await records.trashEntries((await records.listLive()).map((r) => r.entry_id))
     expect((await records.listTrash('DCIM')).trashed).toEqual([])
     expect((await records.listTrash('湖边')).trashed).toHaveLength(1)
@@ -158,9 +158,22 @@ describe('records', () => {
     await records.add('完成 1000')
     await records.add('a_b')
     await records.add('axb')
-    expect((await records.searchLive('卧推')).map((r) => r.content).sort()).toEqual(['上斜卧推 20 公斤', '卧推，60 公斤'])
-    expect((await records.searchLive('100%')).map((r) => r.content)).toEqual(['完成 100%'])
-    expect((await records.searchLive('a_b')).map((r) => r.content)).toEqual(['a_b'])
+    expect((await records.searchLive('卧推')).rows.map((r) => r.content).sort()).toEqual(['上斜卧推 20 公斤', '卧推，60 公斤'])
+    expect((await records.searchLive('100%')).rows.map((r) => r.content)).toEqual(['完成 100%'])
+    expect((await records.searchLive('a_b')).rows.map((r) => r.content)).toEqual(['a_b'])
+  })
+
+  it('search and the trash list show at most the newest RESULT_LIMIT', async () => {
+    for (let i = 0; i <= RESULT_LIMIT; i++) {
+      tick()
+      await records.add(`卧推 ${i}`)
+    }
+    const found = await records.searchLive('卧推')
+    expect([found.rows.length, found.more, found.rows[0].content]).toEqual([RESULT_LIMIT, true, `卧推 ${RESULT_LIMIT}`])
+    expect((await records.searchLive('卧推 1')).more).toBe(false)
+    await records.trashEntries((await records.listLive()).map((r) => r.entry_id))
+    const trash = await records.listTrash()
+    expect([trash.trashed.length, trash.more]).toEqual([RESULT_LIMIT, true])
   })
 
   it('trash search filters trashed rows and returns the matching entries\' live rows', async () => {

@@ -5,12 +5,16 @@ update dialog.
 
 ## 0.4.7
 
-- The main list draws a window of about 200 entries and extends it while scrolling, so long logs stay smooth.
+- The main list reads the log from the database in pages (200 at first, 100 more near an edge, at most 500 held)
+  instead of loading all of it, so long logs stay light and smooth. Database schema v3: an index on the timeline's
+  order, `(logged_at, id)`; older app versions cannot open a database synced from this one.
+- Search and the trash list show at most the newest 500, with a note when there are more.
 - ⌖ in an entry's sheet (from the list, search or the photo viewer) shows the entry in the timeline: centred and
   marked until another is located or it leaves the drawn range. The sheet's icons: full screen, ⌖, edit, delete.
 - The photo viewer's entry line opens that entry's sheet over the viewer.
 - More than about two screens from the newest entries, a button at the bottom left jumps back to them; sending an
-  entry goes back to them too.
+  entry goes back to them too, and one sent at an earlier time is located where it landed.
+- Sync merging reads only the columns it decides on, not every local text.
 - Fix: a strong swipe in the photo viewer skipped several photos; it now stops at the next one.
 
 ## 0.4.6

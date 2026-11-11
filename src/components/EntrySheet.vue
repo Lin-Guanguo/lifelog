@@ -4,7 +4,7 @@ import { useBackHandler } from '../back'
 import type { LogRecord } from '../data/records'
 import { dateOf, formatHours, timeOf } from '../format'
 import { t } from '../i18n'
-import { db, locateEntry, openScreen, reloadLive, retentionHours } from '../store'
+import { db, locateEntry, logChanged, openScreen, retentionHours } from '../store'
 import AppIcon from './AppIcon.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
 import EntryContent from './EntryContent.vue'
@@ -25,14 +25,14 @@ useBackHandler(() => {
 
 function edit() {
   emit('close')
-  openScreen({ name: 'edit', entryId: props.record.entry_id })
+  openScreen({ name: 'edit', record: props.record })
 }
 
 async function remove() {
   await db().trashEntries([props.record.entry_id])
   confirming.value = false
   shown.value = false
-  await reloadLive()
+  logChanged()
 }
 
 // Dragging the handle: up expands; down collapses, then closes.

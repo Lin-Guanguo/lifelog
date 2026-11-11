@@ -25,6 +25,11 @@ export const MIGRATIONS: Migration[] = [
     'CREATE INDEX IF NOT EXISTS records_timeline ON records(logged_at) WHERE deleted_at IS NULL',
   ],
   migrateToV2,
+  // v3: the timeline is read in pages, ordered by (logged_at, id); the index serves both the order and the page bounds.
+  [
+    'DROP INDEX IF EXISTS records_timeline',
+    'CREATE INDEX records_timeline ON records(logged_at, id) WHERE deleted_at IS NULL',
+  ],
 ]
 
 // v2: integer ids (see ids.ts) and purged_at. Permanent deletion keeps the row as a tombstone

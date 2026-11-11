@@ -5,18 +5,19 @@ import { importPhotos } from '../compose'
 import { dateOf, timeOf } from '../format'
 import { t } from '../i18n'
 import type { PhotoSource } from '../media/photos'
-import { closeScreen, db, liveRecords, reloadLive } from '../store'
+import type { LogRecord } from '../data/records'
+import { closeScreen, db, logChanged } from '../store'
 import AppIcon from '../components/AppIcon.vue'
 import BlockEditor from '../components/BlockEditor.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 
-const props = defineProps<{ entryId: number }>()
 // Snapshot: the edit applies to the text that was current when editing started.
-const original = liveRecords.value.find((r) => r.entry_id === props.entryId)
-const text = ref(original?.content ?? '')
+const props = defineProps<{ record: LogRecord }>()
+const original = props.record
+const text = ref(original.content)
 const editor = ref<InstanceType<typeof BlockEditor>>()
 const leaving = ref(false)
-const dirty = computed(() => text.value !== original?.content)
+const dirty = computed(() => text.value !== original.content)
 const canSave = computed(() => dirty.value && text.value.trim() !== '')
 
 function leave() {
@@ -27,9 +28,9 @@ useBackHandler(leave)
 
 async function save() {
   leaving.value = false
-  if (!original || !canSave.value) return
+  if (!canSave.value) return
   await db().edit(original, text.value.trim())
-  await reloadLive()
+  logChanged()
   closeScreen()
 }
 
@@ -42,14 +43,11 @@ async function add(source: PhotoSource) {
   editor.value?.insert(await importPhotos(source))
 }
 
-onMounted(() => {
-  if (!original) closeScreen()
-  editor.value?.focusEnd()
-})
+onMounted(() => editor.value?.focusEnd())
 </script>
 
 <template>
-  <div v-if="original" class="screen">
+  <div class="screen">
     <header class="topbar">
       <button class="icon-btn" type="button" :aria-label="t('common.back')" @click="leave"><AppIcon name="back" /></button>
       <h1>{{ t('edit.title', { date: dateOf(original.logged_at), time: timeOf(original.logged_at) }) }}</h1>

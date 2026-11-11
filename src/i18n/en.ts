@@ -49,6 +49,7 @@ export default {
   'search.placeholder': 'Search all entries',
   'search.prompt': 'Type to search all entries.',
   'search.summary': '{n} matches · newest first',
+  'search.limited': 'Showing the newest {n}; type more to narrow it down',
   'search.none': 'No matching entries.',
 
   'settings.title': 'Settings',
@@ -124,6 +125,7 @@ export default {
   'trash.searchPlaceholder': 'Search items in the trash',
   'trash.retentionHint': 'Items are cleared permanently {duration} after deletion (change in Settings).',
   'trash.noCleanupHint': 'Auto-clear is off (change in Settings).',
+  'trash.limited': 'Showing the newest {n}; search to find older ones.',
   'trash.empty': 'The trash is empty.',
   'trash.noMatch': 'Nothing matches.',
   'trash.entryTitle': 'Entry from {date} {time}',

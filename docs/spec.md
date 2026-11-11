@@ -20,7 +20,13 @@ CREATE TABLE records (
 );
 -- at most one live row per entry
 CREATE UNIQUE INDEX records_one_live ON records(entry_id) WHERE deleted_at IS NULL;
+-- the timeline's order and its pages, v3
+CREATE INDEX records_timeline ON records(logged_at, id) WHERE deleted_at IS NULL;
 ```
+
+The timeline is ordered by `(logged_at, id)`: when it happened, then the order written (ids grow with writing),
+so entries at the same moment have a fixed order. The app never reads the whole log for display: the main list
+reads pages before or after a row's `(logged_at, id)`; search and the trash list show at most the newest 500.
 
 Ids are created offline on any device: `(ms since 2026-01-01) × 4096 + 12 random bits`. They are ordered by
 creation time, exact in JavaScript (below 2⁵³, until about 2095), and strictly increasing per device; two
@@ -29,7 +35,8 @@ devices collide only if they create a row in the same millisecond with the same 
 ### Schema versions
 
 The schema version is SQLite's standard `PRAGMA user_version`. `src/data/schema.ts` holds an ordered
-list of migrations (v1: the table with text UUIDs; v2: integer ids and `purged_at`); on open, each missing step runs in its own transaction
+list of migrations (v1: the table with text UUIDs; v2: integer ids and `purged_at`;
+v3: the timeline index on `(logged_at, id)`); on open, each missing step runs in its own transaction
 together with its version bump. Databases from v0.1.x (no version, table already present) upgrade to
 v1 without changes. v2 rebuilds the table: text ids convert deterministically (time from the row, low bits
 from a hash of the old id; an entry's first row takes the entry's number), so the phone and an old backup
@@ -139,9 +146,10 @@ JavaScript or have to fit in memory.
 ## Screens
 
 - **Main**: chat-style stream, oldest at top, newest at the bottom above the composer; grouped by day; long text clamped to 3 lines.
-  Only a window of the log is drawn (about 200 entries; scrolling near an edge adds 100 there and, past 500, drops the
-  far edge, keeping the view steady). More than about two screens from the newest entries, a round ↓ button at the bottom
-  left jumps back to them; sending an entry (at the current time) goes back to them too.
+  The list holds a window of the log, read from the database in pages (200 entries at first; within three screens of
+  an edge, 100 more are read there; past 500 the far edge is dropped, keeping the view steady). More than about two screens from the newest entries, a round ↓ button at the bottom
+  left jumps back to them; sending an entry (at the current time) goes back to them too,
+  and one sent at an earlier time is located (⌖) where it landed.
   An entry located with ⌖ is drawn, centred and marked until another is located or it leaves the drawn range.
   Entries from the last hour show seconds on a small line under HH:MM, so the time column keeps its width.
   Entries with photos show up to four thumbnails ("+N" for the rest); tapping one opens the photo viewer on it, over
@@ -166,9 +174,11 @@ JavaScript or have to fit in memory.
   not HEIC, loads it in place; otherwise 已是原图), 打开 (Android's open-with list: the gallery copy when exported, else
   LifeLog's file), 保存 (exports a copy to the gallery's LifeLog album as `LifeLog_<file>`, dated by the capture time,
   once; then 已在相册, also for 0.4.x names), 分享 (the original). A photo another device added is downloaded first.
-- **Search**: highlighted matches grouped by day; tap opens the sheet.
+- **Search**: highlighted matches grouped by day, at most the newest 500 (a note says when there are more); tap opens
+  the sheet.
 - **Settings**: language (system / 中文 / English); trash auto-clear period (presets + custom dialog) and trash entry; photo copies (count, size); WebDAV sync (connection, status, sync now, interval); about (check for updates, author pop-up). The main header shows a sync status chip.
-- **Trash**: search box; cards grouped by entry (current text shown for reference); rows show original/saved time and days left; select rows or whole entries; restore or delete forever.
+- **Trash**: search box; cards grouped by entry (current text shown for reference); rows show original/saved time and days left; select rows or whole entries; restore or delete forever. At most the newest 500 rows are listed (a note says when
+  there are more; search finds older ones).
 
 ## Updates and releases
 

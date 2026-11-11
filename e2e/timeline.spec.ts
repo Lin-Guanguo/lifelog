@@ -25,6 +25,19 @@ test('a long log: window, locate from search, jump to latest, scroll back', asyn
   expect(await entries.count()).toBe(WINDOW)
   await expect(page.locator('.stream .entry', { hasText: name(12) })).toHaveCount(0)
 
+  // Select all takes every entry in the log, not only those loaded.
+  const last = entries.last()
+  const box0 = (await last.boundingBox())!
+  await page.mouse.move(box0.x + 40, box0.y + box0.height / 2)
+  await page.mouse.down()
+  await page.waitForTimeout(700) // long press
+  await page.mouse.up()
+  await expect(page.getByRole('heading', { name: '已选 1 条' })).toBeVisible()
+  await page.getByRole('button', { name: '全选' }).click()
+  await expect(page.getByRole('heading', { name: `已选 ${COUNT} 条` })).toBeVisible()
+  await expect(page.getByRole('button', { name: '取消全选' })).toBeVisible()
+  await page.getByRole('button', { name: '退出选择' }).click()
+
   // Search → sheet → ⌖: the old entry is drawn, centred and stays highlighted; the newest are no longer drawn.
   await page.getByRole('button', { name: '搜索' }).click()
   await page.getByRole('searchbox', { name: '搜索记录' }).fill('#0012')
@@ -70,4 +83,15 @@ test('a long log: window, locate from search, jump to latest, scroll back', asyn
   await expect(entries.last()).toContainText('刚写的')
   await expect(entries.last()).toBeInViewport()
   await expect(page.getByRole('button', { name: '回到最新' })).toHaveCount(0)
+
+  // Sending at an earlier time locates the new entry instead, where it landed.
+  await page.getByRole('button', { name: '记录时间' }).click()
+  const picker = page.getByRole('dialog', { name: '记录时间' })
+  await picker.getByRole('button', { name: /^昨天/ }).click()
+  await picker.getByRole('button', { name: '确定' }).click()
+  await page.getByRole('textbox', { name: '新记录' }).fill('补记昨天的')
+  await page.getByRole('button', { name: '发送' }).click()
+  const sent = page.locator('.stream .entry', { hasText: '补记昨天的' })
+  await expect(sent).toHaveClass(/located/)
+  await expect(sent).toBeInViewport()
 })

@@ -62,7 +62,7 @@ describe('migrate', () => {
     const migrated = async (raw: InstanceType<SqlJsStatic['Database']>) => {
       const db = sqlJsExecutor(raw)
       await migrate(db)
-      expect(await schemaVersion(db)).toBe(2)
+      expect(await schemaVersion(db)).toBe(SCHEMA_VERSION)
       return createRecords(db).all()
     }
     const rows = await migrated(v1())

@@ -12,7 +12,7 @@ import MainView from './views/MainView.vue'
 import SearchView from './views/SearchView.vue'
 import SettingsView from './views/SettingsView.vue'
 import TrashView from './views/TrashView.vue'
-import { db, reloadLive, retentionHours, screens } from './store'
+import { db, logChanged, retentionHours, screens } from './store'
 import { autoSync, startAutoSync } from './sync/controller'
 
 const removers: (() => void)[] = []
@@ -38,7 +38,7 @@ onMounted(async () => {
   // Cleanup and sync also run when the app returns to the foreground after a pause.
   const resume = await CapApp.addListener('resume', async () => {
     await db().purgeExpired(retentionHours.value)
-    await reloadLive()
+    logChanged()
     autoSync()
   })
   removers.push(() => back.remove(), () => resume.remove(), startAutoSync())
@@ -55,7 +55,7 @@ onUnmounted(() => removers.forEach((r) => r()))
       <SearchView v-if="screen.name === 'search'" />
       <SettingsView v-else-if="screen.name === 'settings'" />
       <TrashView v-else-if="screen.name === 'trash'" />
-      <EditView v-else-if="screen.name === 'edit'" :entry-id="screen.entryId" />
+      <EditView v-else-if="screen.name === 'edit'" :record="screen.record" />
       <ComposeView v-else-if="screen.name === 'compose'" />
     </template>
   </TransitionGroup>

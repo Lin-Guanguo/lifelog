@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useBackHandler } from '../back'
-import type { LogRecord } from '../data/records'
+import { RESULT_LIMIT, type LogRecord } from '../data/records'
 import { groupByDay, timeOf } from '../format'
 import { t } from '../i18n'
-import { closeScreen, db, liveRecords } from '../store'
+import { closeScreen, db, logVersion } from '../store'
 import AppIcon from '../components/AppIcon.vue'
 import EntrySheet from '../components/EntrySheet.vue'
 import HighlightText from '../components/HighlightText.vue'
@@ -12,6 +12,7 @@ import { photosOf, textOf } from '../media/content'
 
 const query = ref('')
 const results = ref<LogRecord[]>([])
+const more = ref(false) // more matched than are shown
 const input = ref<HTMLInputElement>()
 const sheetRecord = ref<LogRecord>()
 const days = computed(() => groupByDay(results.value))
@@ -20,14 +21,16 @@ useBackHandler(closeScreen)
 let timer: number | undefined
 async function run() {
   const q = query.value.trim()
-  results.value = q ? await db().searchLive(q) : []
+  const page = q ? await db().searchLive(q) : { rows: [], more: false }
+  results.value = page.rows
+  more.value = page.more
 }
 watch(query, () => {
   window.clearTimeout(timer)
   timer = window.setTimeout(run, 150)
 })
 // Edits and deletes made from the sheet change the results.
-watch(liveRecords, run)
+watch(logVersion, run)
 
 onMounted(() => input.value?.focus())
 </script>
@@ -44,7 +47,7 @@ onMounted(() => input.value?.focus())
       <p v-if="!query.trim()" class="empty">{{ t('search.prompt') }}</p>
       <p v-else-if="results.length === 0" class="empty">{{ t('search.none') }}</p>
       <template v-else>
-        <p class="hint">{{ t('search.summary', { n: results.length }) }}</p>
+        <p class="hint">{{ more ? t('search.limited', { n: RESULT_LIMIT }) : t('search.summary', { n: results.length }) }}</p>
         <section v-for="day in days" :key="day.key" class="card result-day">
           <h2 class="section-title" style="margin: 0; padding: 10px 14px 2px">{{ day.label }}</h2>
           <button v-for="record in day.rows" :key="record.id" class="entry result" type="button" @click="sheetRecord = record">

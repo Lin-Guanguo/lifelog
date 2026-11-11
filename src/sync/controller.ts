@@ -4,7 +4,7 @@ import { reactive } from 'vue'
 import { NewerSchemaError } from '../data/schema'
 import { photoFiles, setPhotoDownload } from '../media/photos'
 import { t } from '../i18n'
-import { db, reloadLive } from '../store'
+import { db, logChanged } from '../store'
 import { platformTransport } from './http'
 import { downloadPhoto, REMOTE_FILE, sync as syncOnce, type SyncState } from './sync'
 import { createWebDav, WebDavError, type WebDavConfig } from './webdav'
@@ -127,7 +127,7 @@ export function syncNow(): Promise<void> {
       const result = await syncOnce(dav(settings), db(), sync.state, sync.dirty, () => { changesAtUpload = changes },
         Date.now(), photoFiles)
       sync.state = result.state
-      if (result.merged) await reloadLive()
+      if (result.merged) logChanged()
       // Writes made after the snapshot was taken are still pending.
       if (result.uploaded) sync.dirty = changes !== changesAtUpload
       sync.status = 'idle'
