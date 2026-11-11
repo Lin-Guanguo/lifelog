@@ -3,6 +3,16 @@
 Each release's notes come from its section here (the release workflow requires one) and are shown in the app's
 update dialog.
 
+## 0.4.7
+
+- The main list draws a window of about 200 entries and extends it while scrolling, so long logs stay smooth.
+- ⌖ in an entry's sheet (from the list, search or the photo viewer) shows the entry in the timeline: centred and
+  marked until another is located or it leaves the drawn range. The sheet's icons: full screen, ⌖, edit, delete.
+- The photo viewer's entry line opens that entry's sheet over the viewer.
+- More than about two screens from the newest entries, a button at the bottom left jumps back to them; sending an
+  entry goes back to them too.
+- Fix: a strong swipe in the photo viewer skipped several photos; it now stops at the next one.
+
 ## 0.4.6
 
 - Photo viewer: pinch or double-tap to zoom (up to 5×); zooming in loads the full-resolution original. While zoomed,

@@ -22,12 +22,14 @@ export default {
   'main.empty': '还没有记录。在下面写下第一句。',
   'main.exitSelect': '退出选择',
   'main.selected': '已选 {n} 条',
+  'main.toLatest': '回到最新',
   'main.deleteSelected': '删除 {n} 条（移到回收站）',
 
   'sheet.label': '记录详情',
   'sheet.fullscreen': '全屏查看',
   'sheet.collapse': '退出全屏',
   'sheet.edit': '编辑',
+  'sheet.locate': '在时间线中定位',
   'sheet.delete': '删除',
 
   'delete.title': '删除这条记录？',

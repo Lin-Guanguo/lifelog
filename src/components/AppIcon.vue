@@ -18,6 +18,8 @@ const PATHS = {
   share: 'M12 15V4M8 8l4-4 4 4M5 12v8h14v-8',
   open: 'M14 4h6v6M20 4l-9 9M18 14v6H4V6h6',
   info: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 11v6M12 7.5h.01',
+  locate: 'M12 2v4M12 18v4M2 12h4M18 12h4M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10z',
+  down: 'M12 5v14M6 13l6 6 6-6',
 } as const
 
 defineProps<{ name: keyof typeof PATHS; size?: number }>()

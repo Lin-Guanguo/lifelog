@@ -5,9 +5,10 @@ import { chooseTime, clearDraft, draft, importPhotos, isOld, offerPhotoTimes } f
 import type { LogRecord } from '../data/records'
 import { groupByDay, logTime, secondsOf, timeOf } from '../format'
 import { t } from '../i18n'
-import { composeContent, photosOf, takenAt, textOf } from '../media/content'
+import { composeContent, photosOf, takenAt, textOf, type PhotoRef } from '../media/content'
 import type { PhotoSource } from '../media/photos'
-import { db, liveRecords, openScreen, reloadLive } from '../store'
+import { db, liveRecords, locateRequest, openScreen, reloadLive, screens } from '../store'
+import { around, EDGE_PX, extendDown, extendUp, follow, JUMP_PX, newest, type Range } from '../timeline'
 import AppIcon from '../components/AppIcon.vue'
 import EntrySheet from '../components/EntrySheet.vue'
 import MediaImage from '../components/MediaImage.vue'
@@ -23,7 +24,11 @@ const list = ref<HTMLElement>()
 const sheetRecord = ref<LogRecord>()
 const selected = ref(new Set<number>())
 const selecting = computed(() => selected.value.size > 0)
-const days = computed(() => groupByDay(liveRecords.value))
+// The list draws a window of the log (timeline.ts); scrolling near an edge extends it there.
+const range = ref<Range>(newest(liveRecords.value.length))
+const drawn = computed(() => liveRecords.value.slice(range.value.start, range.value.end))
+const days = computed(() => groupByDay(drawn.value))
+watch(liveRecords, (after, before) => { range.value = follow(range.value, before, after) })
 const allSelected = computed(() => selected.value.size === liveRecords.value.length)
 const syncChip = computed(() => {
   if (!sync.settings) return null
@@ -92,35 +97,93 @@ function onClick(record: LogRecord) {
 // Tapping a thumbnail opens the viewer on it, over every photo in the log (oldest first), so swiping goes on into
 // other entries. Tapping elsewhere on the entry opens its sheet; in select mode a thumbnail selects too.
 const viewer = ref<number>()
-const allPhotos = computed(() => liveRecords.value.flatMap((r) => photosOf(r.content)))
-const photoEntries = computed(() => liveRecords.value.flatMap((r) => photosOf(r.content).map(() => r)))
-const flashed = ref<number>()
-
-// From the viewer to a photo's entry: close it, bring the entry into view with a brief highlight, open its sheet.
-async function showEntry(record: LogRecord) {
-  viewer.value = undefined
-  await nextTick()
-  list.value?.querySelector(`[data-entry="${record.entry_id}"]`)?.scrollIntoView({ block: 'start' })
-  flashed.value = record.entry_id
-  window.setTimeout(() => { if (flashed.value === record.entry_id) flashed.value = undefined }, 1500)
-  sheetRecord.value = record
-}
-const photoOffsets = computed(() => {
+// Every photo in the log, for the viewer, in one pass over it: each photo's entry, and where each entry's photos start.
+const photoIndex = computed(() => {
+  const photos: PhotoRef[] = []
+  const entries: LogRecord[] = []
   const offsets = new Map<number, number>()
-  let n = 0
   for (const r of liveRecords.value) {
-    offsets.set(r.entry_id, n)
-    n += photosOf(r.content).length
+    offsets.set(r.entry_id, photos.length)
+    for (const photo of photosOf(r.content)) {
+      photos.push(photo)
+      entries.push(r)
+    }
   }
-  return offsets
+  return { photos, entries, offsets }
 })
+
+// The viewer's entry line opens that entry's sheet over the viewer. The viewer closes when an entry is edited (the
+// editor opens) or the log changes under it (its photos would shift).
+watch(() => screens.value.length, (n) => { if (n) viewer.value = undefined })
+watch(liveRecords, () => { viewer.value = undefined })
+
+// ⌖ in a sheet (here, in search, over the viewer): everything on top closes, the entry is drawn and scrolled to the
+// middle, and stays highlighted until another is located or it leaves the drawn range.
+const located = ref<number>()
+watch(locateRequest, async (request) => {
+  if (!request) return
+  viewer.value = undefined
+  sheetRecord.value = undefined
+  const index = liveRecords.value.findIndex((r) => r.entry_id === request.entryId)
+  if (index < 0) return
+  if (index < range.value.start || index >= range.value.end) range.value = around(index, liveRecords.value.length)
+  located.value = request.entryId
+  await nextTick()
+  list.value?.querySelector(`[data-entry="${request.entryId}"]`)?.scrollIntoView({ block: 'center' })
+})
+watch(drawn, (rows) => {
+  if (located.value !== undefined && !rows.some((r) => r.entry_id === located.value)) located.value = undefined
+})
+
+// Extending the window keeps what is on screen where it is: an entry that stays drawn is measured before and after.
+let adjusting = false
+async function extend(next: Range, anchorId: number | undefined) {
+  const el = list.value!
+  const anchor = () => (anchorId === undefined ? null : el.querySelector<HTMLElement>(`[data-entry="${anchorId}"]`))
+  const top = anchor()?.getBoundingClientRect().top
+  adjusting = true
+  range.value = next
+  await nextTick()
+  const after = anchor()?.getBoundingClientRect().top
+  if (top !== undefined && after !== undefined) el.scrollTop += after - top
+  adjusting = false
+}
+
+// The jump-to-latest button shows while the newest entries are not drawn, or more than JUMP_PX of the list is below.
+const farFromLatest = ref(false)
+function updateFarFromLatest() {
+  const el = list.value
+  if (!el) return
+  const below = el.scrollHeight - el.scrollTop - el.clientHeight
+  farFromLatest.value = range.value.end < liveRecords.value.length || below > JUMP_PX
+}
+watch(range, async () => { await nextTick(); updateFarFromLatest() })
+async function onListScroll() {
+  const el = list.value
+  if (!el) return
+  updateFarFromLatest()
+  const below = el.scrollHeight - el.scrollTop - el.clientHeight
+  if (adjusting) return
+  const rows = drawn.value
+  if (el.scrollTop < EDGE_PX && range.value.start > 0) await extend(extendUp(range.value), rows[0]?.entry_id)
+  else if (below < EDGE_PX && range.value.end < liveRecords.value.length) {
+    await extend(extendDown(range.value, liveRecords.value.length), rows[rows.length - 1]?.entry_id)
+  }
+}
+
+// Bottom-left button when far from the newest entries: back to them (a located entry out of range loses its highlight).
+async function toLatest() {
+  range.value = newest(liveRecords.value.length)
+  farFromLatest.value = false
+  await scrollToBottom()
+}
 
 function onPhoto(record: LogRecord, index: number) {
   if (longPressed || selecting.value) {
     onClick(record)
     return
   }
-  viewer.value = (photoOffsets.value.get(record.entry_id) ?? 0) + index
+  viewer.value = (photoIndex.value.offsets.get(record.entry_id) ?? 0) + index
 }
 
 async function deleteSelected() {
@@ -152,7 +215,7 @@ async function send() {
   await nextTick()
   resizeComposer()
   await reloadLive()
-  if (!earlier) await scrollToBottom()
+  if (!earlier) await toLatest()
 }
 
 async function addPhotos(source: PhotoSource) {
@@ -200,25 +263,30 @@ onMounted(scrollToBottom)
       </button>
     </header>
 
-    <main ref="list" class="scroll stream">
-      <p v-if="liveRecords.length === 0" class="empty">{{ t('main.empty') }}</p>
-      <section v-for="day in days" :key="day.key">
-        <div class="daypill">{{ day.label }}</div>
-        <div v-for="record in day.rows" :key="record.id" class="entry" :data-entry="record.entry_id"
-          :class="{ selected: selected.has(record.entry_id), flash: flashed === record.entry_id }"
-          role="button" tabindex="0"
-          @pointerdown="onPointerDown($event, record)" @pointermove="onPointerMove" @pointerup="cancelPress"
-          @pointercancel="cancelPress" @pointerleave="cancelPress" @contextmenu.prevent
-          @click="onClick(record)" @keydown.enter="onClick(record)">
-          <input v-if="selecting" type="checkbox" tabindex="-1" :checked="selected.has(record.entry_id)" aria-hidden="true">
-          <time>{{ timeOf(record.logged_at) }}<small v-if="recent(record.logged_at)" class="sec">:{{ secondsOf(record.logged_at) }}</small></time>
-          <div class="body">
-            <p v-if="textOf(record.content)" class="text">{{ textOf(record.content) }}</p>
-            <PhotoStrip v-if="photosOf(record.content).length" :photos="photosOf(record.content)" @open="(i) => onPhoto(record, i)" />
+    <div class="list-wrap">
+      <main ref="list" class="scroll stream" @scroll.passive="onListScroll">
+        <p v-if="liveRecords.length === 0" class="empty">{{ t('main.empty') }}</p>
+        <section v-for="day in days" :key="day.key">
+          <div class="daypill">{{ day.label }}</div>
+          <div v-for="record in day.rows" :key="record.id" class="entry" :data-entry="record.entry_id"
+            :class="{ selected: selected.has(record.entry_id), located: located === record.entry_id }"
+            role="button" tabindex="0"
+            @pointerdown="onPointerDown($event, record)" @pointermove="onPointerMove" @pointerup="cancelPress"
+            @pointercancel="cancelPress" @pointerleave="cancelPress" @contextmenu.prevent
+            @click="onClick(record)" @keydown.enter="onClick(record)">
+            <input v-if="selecting" type="checkbox" tabindex="-1" :checked="selected.has(record.entry_id)" aria-hidden="true">
+            <time>{{ timeOf(record.logged_at) }}<small v-if="recent(record.logged_at)" class="sec">:{{ secondsOf(record.logged_at) }}</small></time>
+            <div class="body">
+              <p v-if="textOf(record.content)" class="text">{{ textOf(record.content) }}</p>
+              <PhotoStrip v-if="photosOf(record.content).length" :photos="photosOf(record.content)" @open="(i) => onPhoto(record, i)" />
+            </div>
           </div>
-        </div>
-      </section>
-    </main>
+        </section>
+      </main>
+      <button v-if="farFromLatest && !selecting" class="to-latest" type="button" :aria-label="t('main.toLatest')" @click="toLatest">
+        <AppIcon name="down" :size="20" />
+      </button>
+    </div>
 
     <footer v-if="selecting" class="footer-bar">
       <button class="danger" type="button" @click="deleteSelected">{{ t('main.deleteSelected', { n: selected.size }) }}</button>
@@ -252,8 +320,8 @@ onMounted(scrollToBottom)
     </div>
 
     <EntrySheet v-if="sheetRecord" :record="sheetRecord" @close="sheetRecord = undefined" />
-    <PhotoViewer v-if="viewer !== undefined" :photos="allPhotos" :entries="photoEntries" :start="viewer"
-      @close="viewer = undefined" @entry="showEntry" />
+    <PhotoViewer v-if="viewer !== undefined" :photos="photoIndex.photos" :entries="photoIndex.entries" :start="viewer"
+      @close="viewer = undefined" @entry="(record) => (sheetRecord = record)" />
   </div>
 </template>
 
@@ -268,7 +336,13 @@ onMounted(scrollToBottom)
 .sync-chip.bad { color: var(--danger); }
 .stream { display: flex; flex-direction: column; }
 .entry .body { flex-grow: 1; min-width: 0; }
-.entry.flash { animation: flash 1.5s var(--ease); }
-@keyframes flash { 0%, 40% { background: var(--accent-soft); } 100% { background: transparent; } }
+/* A located entry stays marked while its context is browsed. */
+.entry.located { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+.stream { overflow-anchor: none; } /* the window keeps the view steady itself */
+.list-wrap { position: relative; flex: 1; min-height: 0; display: flex; }
+.list-wrap > .stream { flex: 1; }
+.to-latest { position: absolute; left: 14px; bottom: 12px; width: 42px; height: 42px; border-radius: 50%;
+  border: 1px solid var(--field); background: var(--surface); color: var(--ink); display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, .15); z-index: 2; }
 .stream > :first-child { margin-top: auto; }
 </style>

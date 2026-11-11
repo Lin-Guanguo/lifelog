@@ -34,3 +34,12 @@ export function openScreen(screen: Screen): void {
 export function closeScreen(): void {
   screens.value.pop()
 }
+
+// "Show this entry in the timeline" (⌖ in an entry's sheet): screens close, and the main list brings the entry into
+// view and highlights it. `seq` makes locating the same entry twice a new request.
+export const locateRequest = ref<{ entryId: number; seq: number }>()
+
+export function locateEntry(entryId: number): void {
+  screens.value = []
+  locateRequest.value = { entryId, seq: (locateRequest.value?.seq ?? 0) + 1 }
+}

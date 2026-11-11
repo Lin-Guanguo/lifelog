@@ -4,7 +4,7 @@ import { useBackHandler } from '../back'
 import type { LogRecord } from '../data/records'
 import { dateOf, formatHours, timeOf } from '../format'
 import { t } from '../i18n'
-import { db, openScreen, reloadLive, retentionHours } from '../store'
+import { db, locateEntry, openScreen, reloadLive, retentionHours } from '../store'
 import AppIcon from './AppIcon.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
 import EntryContent from './EntryContent.vue'
@@ -73,6 +73,9 @@ function onDragEnd(event: PointerEvent) {
             <button class="round-btn" type="button" :aria-label="t(expanded ? 'sheet.collapse' : 'sheet.fullscreen')"
               :title="t(expanded ? 'sheet.collapse' : 'sheet.fullscreen')" @click="expanded = !expanded">
               <AppIcon :name="expanded ? 'collapse' : 'expand'" :size="20" />
+            </button>
+            <button class="round-btn" type="button" :aria-label="t('sheet.locate')" :title="t('sheet.locate')" @click="locateEntry(record.entry_id)">
+              <AppIcon name="locate" :size="20" />
             </button>
             <button class="round-btn" type="button" :aria-label="t('sheet.edit')" :title="t('sheet.edit')" style="color: var(--accent)" @click="edit">
               <AppIcon name="edit" :size="20" />

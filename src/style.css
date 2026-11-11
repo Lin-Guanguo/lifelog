@@ -92,10 +92,11 @@ input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--accent); m
 .search-field { display: flex; flex-grow: 1; }
 .search-field input { height: 44px; padding: 0 12px; border-radius: 12px; }
 
-.scrim { position: fixed; inset: 0; background: var(--scrim); }
+.scrim { position: fixed; inset: 0; background: var(--scrim); z-index: 20; }
 .sheet {
   position: fixed; left: 0; right: 0; bottom: 0; max-height: 72vh; background: var(--surface); border-radius: 22px 22px 0 0;
   padding: 10px 20px calc(20px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom))); display: flex; flex-direction: column; gap: 10px;
+  z-index: 20; /* the same as the photo viewer: whichever opened later is on top (a sheet over the viewer, or the reverse) */
 }
 .sheet { transition: transform .28s var(--ease), max-height .32s var(--ease), min-height .32s var(--ease), border-radius .32s var(--ease),
   padding-top .32s var(--ease); }
@@ -106,7 +107,7 @@ input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--accent); m
 .longtext { margin: 0; font-size: 17px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
 .round-btn { width: 44px; height: 44px; border: 1px solid var(--field); border-radius: 50%; background: var(--surface); display: flex; align-items: center; justify-content: center; }
 
-.dialog-wrap { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 24px; background: var(--scrim); z-index: 10; }
+.dialog-wrap { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 24px; background: var(--scrim); z-index: 30; }
 .dialog { width: 100%; max-width: 360px; background: var(--surface); border-radius: 18px; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
 .dialog h2 { margin: 0; font-size: 17px; }
 .dialog p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--muted); }

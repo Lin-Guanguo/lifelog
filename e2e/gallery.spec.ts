@@ -2,6 +2,7 @@ import { devices, expect, test, type Browser, type Page } from '@playwright/test
 import { readFileSync, writeFileSync } from 'node:fs'
 import pkg from '../package.json' with { type: 'json' }
 import { choose, jpeg } from './images'
+import { entryName, putLongLog } from './longlog'
 
 // Renders every screen of the real app (production build) in light and dark mode and writes a
 // self-contained review page: docs/design/ui.html. Run with `pnpm gallery`.
@@ -21,7 +22,7 @@ async function capture(browser: Browser, theme: Theme) {
     ...devices['Pixel 7'], baseURL: 'http://localhost:5199', locale: 'zh-CN', timezoneId: 'Asia/Shanghai', colorScheme: theme,
     permissions: ['clipboard-read', 'clipboard-write'],
   })
-  const page = await context.newPage()
+  let page = await context.newPage()
   let flowIndex = -1
   let shotIndex = 0
 
@@ -259,6 +260,35 @@ async function capture(browser: Browser, theme: Theme) {
   await shot('New version found', '')
   await page.getByRole('button', { name: '以后再说' }).click()
   await back().click()
+
+  flow('Long log', 'The main list draws a window of about 200 entries and extends it while scrolling, so a long log '
+    + 'stays light. ⌖ in any entry sheet (main list, search, photo viewer) brings the entry into the timeline: it is '
+    + 'drawn, centred and stays highlighted until another is located or it leaves the drawn range. Far from the newest '
+    + 'entries, a button bottom-left jumps back to them.')
+  const longLog = await browser.newContext({ ...devices['Pixel 7'], baseURL: 'http://localhost:5199', locale: 'zh-CN',
+    timezoneId: 'Asia/Shanghai', colorScheme: theme })
+  const mainPage = page
+  page = await longLog.newPage()
+  await putLongLog(`gallery-long-${theme}`, 300)
+  await page.goto('/')
+  await page.getByRole('button', { name: 'LifeLog，打开设置' }).click()
+  await page.getByLabel('服务器地址').fill(DAV)
+  await page.getByLabel('用户名').fill('me')
+  await page.getByLabel('密码 / 应用密码').fill('secret')
+  await page.getByLabel('远端目录').fill(`gallery-long-${theme}`)
+  await page.getByRole('button', { name: '保存并测试连接' }).click()
+  await expect(page.getByRole('status')).toContainText('上次同步')
+  await page.getByRole('button', { name: '返回' }).click()
+  await page.getByRole('button', { name: '搜索' }).click()
+  await page.getByRole('searchbox', { name: '搜索记录' }).fill('#0040')
+  await page.locator('.result', { hasText: entryName(40) }).click()
+  await shot('Sheet with ⌖', 'Right-hand icons, top to bottom: full screen, ⌖ show in timeline, edit, delete.')
+  await page.getByRole('button', { name: '在时间线中定位' }).click()
+  await expect(page.locator('.entry.located')).toBeInViewport()
+  await shot('Located', 'The entry is centred and marked; scroll either way for its context. ↓ (bottom left) jumps to '
+    + 'the latest and ends the mark once the entry leaves the drawn range.')
+  await longLog.close()
+  page = mainPage
 
   flow('English', 'Every visible string comes from the i18n catalogs; the language follows the system or Settings.')
   await page.getByRole('button', { name: 'LifeLog，打开设置' }).click()

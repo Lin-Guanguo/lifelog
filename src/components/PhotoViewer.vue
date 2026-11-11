@@ -293,7 +293,7 @@ const save = () => act(async (p) => {
 .track::-webkit-scrollbar { display: none; }
 .track.locked { overflow-x: hidden; }
 .track.animate { transition: transform .2s var(--ease); }
-.slide { flex: 0 0 100%; scroll-snap-align: center; display: flex; overflow: hidden; }
+.slide { flex: 0 0 100%; scroll-snap-align: center; scroll-snap-stop: always; display: flex; overflow: hidden; } /* a fling stops at the next photo */
 /* Not zoomed: horizontal swipes go to the track (next photo); pinches and taps come here. Zoomed: everything here. */
 .stage { flex: 1; position: relative; touch-action: pan-x; overflow: hidden; }
 .stage.zoomed { touch-action: none; }

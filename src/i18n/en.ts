@@ -23,12 +23,14 @@ export default {
   'main.empty': 'No entries yet. Write the first one below.',
   'main.exitSelect': 'Exit selection',
   'main.selected': '{n} selected',
+  'main.toLatest': 'Jump to latest',
   'main.deleteSelected': 'Delete {n} (move to trash)',
 
   'sheet.label': 'Entry details',
   'sheet.fullscreen': 'Full screen',
   'sheet.collapse': 'Exit full screen',
   'sheet.edit': 'Edit',
+  'sheet.locate': 'Show in timeline',
   'sheet.delete': 'Delete',
 
   'delete.title': 'Delete this entry?',

@@ -139,13 +139,17 @@ JavaScript or have to fit in memory.
 ## Screens
 
 - **Main**: chat-style stream, oldest at top, newest at the bottom above the composer; grouped by day; long text clamped to 3 lines.
+  Only a window of the log is drawn (about 200 entries; scrolling near an edge adds 100 there and, past 500, drops the
+  far edge, keeping the view steady). More than about two screens from the newest entries, a round ↓ button at the bottom
+  left jumps back to them; sending an entry (at the current time) goes back to them too.
+  An entry located with ⌖ is drawn, centred and marked until another is located or it leaves the drawn range.
   Entries from the last hour show seconds on a small line under HH:MM, so the time column keeps its width.
   Entries with photos show up to four thumbnails ("+N" for the rest); tapping one opens the photo viewer on it, over
   every photo in the log in timeline order (swiping continues into other entries); the entry's first line shows above
-  the time, and tapping it closes the viewer, scrolls the list to that entry (brief highlight) and opens its sheet.
-  Tapping elsewhere on an entry opens the sheet.
-  - Tap: half-screen sheet with the full text and three icons stacked bottom-right (full screen, edit, delete with
-    confirmation). Full screen expands the same sheet in place, keeping the icons; the first icon or back collapses it.
+  the time, and tapping it opens the entry's sheet over the viewer. Tapping elsewhere on an entry opens the sheet.
+  - Tap: half-screen sheet with the full text and four icons stacked bottom-right (full screen, ⌖ show in timeline,
+    edit, delete with confirmation). The same sheet opens from search results and from the photo viewer's entry line
+    (over the viewer). Full screen expands the sheet in place, keeping the icons; the first icon or back collapses it.
     Dragging the handle up expands, down collapses or closes.
   - Long-press: multi-select; tap more rows; delete moves them to the trash.
   - "LifeLog ›" opens Settings; the search icon opens Search.

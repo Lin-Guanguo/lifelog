@@ -202,13 +202,21 @@ test('photos: add, choose the time, lay out, view, sync', async ({ page, browser
   await drag(220)
   await expect(all).toBeHidden()
 
-  // The entry line under the time leads to that entry: the viewer closes and its sheet opens.
+  // The entry line under the time opens that entry's sheet over the viewer; closing it returns to the viewer.
   await page.locator('.stream .entry', { hasText: '湖边走了一圈' }).locator('.strip .thumb').first().click()
   await all.getByRole('button', { name: '查看这条记录' }).click()
-  await expect(all).toBeHidden()
-  await expect(page.getByRole('dialog', { name: '记录详情' })).toContainText('湖边走了一圈')
+  const over = page.getByRole('dialog', { name: '记录详情' })
+  await expect(over).toContainText('湖边走了一圈')
+  await expect(over).toBeInViewport()
   await page.locator('.scrim').click({ position: { x: 10, y: 10 } })
-  await expect(page.getByRole('dialog', { name: '记录详情' })).toBeHidden()
+  await expect(over).toBeHidden()
+  await expect(all).toBeVisible()
+  // ⌖ in that sheet closes everything and marks the entry in the timeline.
+  await all.getByRole('button', { name: '查看这条记录' }).click()
+  await over.getByRole('button', { name: '在时间线中定位' }).click()
+  await expect(all).toBeHidden()
+  await expect(over).toBeHidden()
+  await expect(page.locator('.stream .entry', { hasText: '湖边走了一圈' })).toHaveClass(/located/)
 
   // Leaving the layout editor keeps paragraphs apart; the photos wait in the tray after the text.
   await page.getByRole('textbox', { name: '新记录' }).fill('甲\n乙')
