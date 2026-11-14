@@ -236,6 +236,7 @@ function updatePosition() {
 }
 const listResized = new ResizeObserver(() => {
   if (atBottom) list.value?.scrollTo({ top: list.value.scrollHeight })
+  updatePosition() // a list that grew may have reached its bottom: the keyboard closing resizes it twice
 })
 onMounted(() => listResized.observe(list.value!))
 onUnmounted(() => listResized.disconnect())

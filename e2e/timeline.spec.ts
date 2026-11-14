@@ -107,7 +107,15 @@ test('a long log: window, locate from search, jump to latest, scroll back', asyn
   await page.setViewportSize(full)
   await expect.poll(below).toBe(400)
   expect(await top()).toBe(before)
-  await page.locator('.stream').evaluate((el) => el.scrollTo({ top: el.scrollHeight }))
+  // The keyboard closing near the bottom: the screen grows, then the bottom inset comes back. The list ends at its bottom.
+  await page.setViewportSize(withKeyboard)
+  await page.locator('.stream').evaluate((el) => el.scrollBy(0, 600))
+  await expect.poll(below).toBe(100)
+  await page.setViewportSize(full)
+  await expect.poll(below).toBe(0)
+  await page.evaluate(() => document.documentElement.style.setProperty('--safe-area-inset-bottom', '40px'))
+  await expect.poll(below).toBe(0)
+  await page.evaluate(() => document.documentElement.style.setProperty('--safe-area-inset-bottom', '0px'))
 
   // Sending at an earlier time locates the new entry instead, where it landed.
   await page.getByRole('button', { name: '记录时间' }).click()
