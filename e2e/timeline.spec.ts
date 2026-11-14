@@ -85,6 +85,13 @@ test('a long log: window, locate from search, jump to latest, scroll back', asyn
   await expect(entries.last()).toBeInViewport()
   await expect(page.getByRole('button', { name: '回到最新' })).toHaveCount(0)
 
+  // At the bottom, the list stays there when it gets shorter or taller (the keyboard, the system bars' insets).
+  const below = () => page.locator('.stream').evaluate((el) => Math.round(el.scrollHeight - el.scrollTop - el.clientHeight))
+  for (const inset of ['40px', '300px', '0px']) {
+    await page.evaluate((v) => document.documentElement.style.setProperty('--safe-area-inset-bottom', v), inset)
+    await expect.poll(below).toBe(0)
+  }
+
   // Sending at an earlier time locates the new entry instead, where it landed.
   await page.getByRole('button', { name: '记录时间' }).click()
   const picker = page.getByRole('dialog', { name: '记录时间' })

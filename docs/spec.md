@@ -151,6 +151,7 @@ JavaScript or have to fit in memory.
   left jumps back to them; sending an entry (at the current time) goes back to them too,
   and one sent at an earlier time is located (⌖) where it landed.
   An entry located with ⌖ is drawn, centred and marked until another is located or it leaves the drawn range.
+  At its bottom, the list stays there when its height changes (the keyboard opening or closing, the composer growing).
   Entries from the last hour show seconds on a small line under HH:MM, so the time column keeps its width. While the
   newest entry is one of them, a line under it counts the time since it, every second (距今 2 分 41 秒: the rest
   between two sets).

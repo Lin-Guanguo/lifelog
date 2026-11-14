@@ -183,7 +183,7 @@ function change(next: (w: Window) => Promise<Window | undefined>, keepView = tru
         if (el) list.value!.scrollTop += el.getBoundingClientRect().top - anchor.top
       }
     }
-    updateFarFromLatest()
+    updatePosition()
   }).finally(() => {
     changing--
     window.setTimeout(onListScroll) // the new window may itself end near the screen (a short log, a big change)
@@ -224,16 +224,25 @@ watch(selecting, async (on) => { if (on) liveCount.value = await db().countLive(
 
 // The jump-to-latest button shows while the newest entries are not in the window, or more than JUMP_PX is below.
 const farFromLatest = ref(false)
-function updateFarFromLatest() {
+// At its bottom, the list stays there when its height changes (the keyboard or the system bars' insets coming and
+// going, the composer growing): otherwise the composer would cover the last lines.
+let atBottom = true
+function updatePosition() {
   const el = list.value
   if (!el) return
   const below = el.scrollHeight - el.scrollTop - el.clientHeight
   farFromLatest.value = win.value.newer || below > JUMP_PX
+  atBottom = below < 2
 }
+const listResized = new ResizeObserver(() => {
+  if (atBottom) list.value?.scrollTo({ top: list.value.scrollHeight })
+})
+onMounted(() => listResized.observe(list.value!))
+onUnmounted(() => listResized.disconnect())
 function onListScroll() {
   const el = list.value
   if (!el) return
-  updateFarFromLatest()
+  updatePosition()
   if (changing) return
   const below = el.scrollHeight - el.scrollTop - el.clientHeight
   if (el.scrollTop < EDGE_PX && win.value.older) void change((w) => extendUp(db(), w))
@@ -244,7 +253,7 @@ function onListScroll() {
 async function toLatest() {
   await change(() => newest(db()), false)
   await scrollToBottom()
-  updateFarFromLatest()
+  updatePosition()
 }
 
 function onPhoto(record: LogRecord, index: number) {

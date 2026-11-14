@@ -3,6 +3,11 @@
 Each release's notes come from its section here (the release workflow requires one) and are shown in the app's
 update dialog.
 
+## Unreleased
+
+- Fix: after the keyboard closed, the list ended a little above its bottom, hiding the 距今 line. At its bottom, the
+  list now stays there when its height changes (the keyboard opening or closing, the composer growing).
+
 ## 0.4.8
 
 - Long-press an entry for a menu: 复制, 复制到输入框 (its text goes into the composer, after anything already typed,
