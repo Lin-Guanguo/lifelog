@@ -49,7 +49,7 @@ Shipped migrations are never edited; changes are new migrations.
 |---|---|
 | Send | insert a row |
 | Edit | one transaction: soft-delete the live row, insert a new row with the same `entry_id` and `logged_at` |
-| Delete (sheet, full view, multi-select) | soft-delete the entry's live row |
+| Delete (sheet, full view, long-press menu, multi-select) | soft-delete the entry's live row |
 | Restore (trash) | insert a new live row with the same text, `entry_id` and `logged_at`; purge the restored trash row; if the entry has a live row, it is soft-deleted first after an overwrite prompt. One row per entry per restore |
 | Delete forever (trash) | purge the selected trashed rows: `content = ''`, `purged_at` set; the row stays as a ~60-byte tombstone |
 | Auto-clear | on start and resume, purge rows trashed longer than the retention (1 / 7 / 30 days, or custom hours/days/never; default 7 days) |
@@ -92,7 +92,7 @@ asked. An entry's text references the photo by a line of its own; nothing else i
   and on the server in `<folder>/media/`. Other devices download a photo when they first show it. For display the phone
   keeps a local preview (long side 1600 px WebP, made when the original is larger or HEIC), a cache that is never
   synced and is rebuilt when missing.
-- At each sync (automatic or manual), after merging, files on this device that no row references any more
+- At each sync that merges or uploads something (automatic or manual), files on this device that no row references any more
   (permanently deleted, or removed in an edit and purged) are deleted, unless written in the last 24 hours (a photo
   in the tray or an unsaved edit is not referenced yet; adding a photo again refreshes its date). The check uses the
   same snapshot as the upload. Files on the server are never deleted.
@@ -125,7 +125,7 @@ One sync step:
    two-device runs).
 3. Upload only if the server lacks something (local changes, data changed by the merge, or no file
    yet) with a plain `PUT` over `lifelog.sqlite`. Otherwise just adopt the remote version (no ping-pong
-   between devices). Uploading to a temporary name and `MOVE`-ing it over the target is not portable:
+   between devices): with nothing new on either side a sync is that one `PROPFIND`, and the log is not read. Uploading to a temporary name and `MOVE`-ing it over the target is not portable:
    Nutstore (坚果云) answers 409 to a MOVE onto an existing file even with `Overwrite: T`. A leftover
    `lifelog.sqlite.uploading` from v0.2.0–0.2.2 is deleted after the next upload. Before the database, photo
    copies this device has that rows reference and `<folder>/media/` lacks (one `PROPFIND`, `Depth: 1`) are
@@ -151,7 +151,9 @@ JavaScript or have to fit in memory.
   left jumps back to them; sending an entry (at the current time) goes back to them too,
   and one sent at an earlier time is located (⌖) where it landed.
   An entry located with ⌖ is drawn, centred and marked until another is located or it leaves the drawn range.
-  Entries from the last hour show seconds on a small line under HH:MM, so the time column keeps its width.
+  Entries from the last hour show seconds on a small line under HH:MM, so the time column keeps its width. While the
+  newest entry is one of them, a line under it counts the time since it, every second (距今 2 分 41 秒: the rest
+  between two sets).
   Entries with photos show up to four thumbnails ("+N" for the rest); tapping one opens the photo viewer on it, over
   every photo in the log in timeline order (swiping continues into other entries); the entry's first line shows above
   the time, and tapping it opens the entry's sheet over the viewer. Tapping elsewhere on an entry opens the sheet.
@@ -159,7 +161,10 @@ JavaScript or have to fit in memory.
     edit, delete with confirmation). The same sheet opens from search results and from the photo viewer's entry line
     (over the viewer). Full screen expands the sheet in place, keeping the icons; the first icon or back collapses it.
     Dragging the handle up expands, down collapses or closes.
-  - Long-press: multi-select; tap more rows; delete moves them to the trash.
+  - Long-press: a menu next to the entry (below it, or above when there is no room), each item an icon and a label:
+    复制 (the text to the clipboard), 复制到输入框 (the text into the composer, after anything already typed, to change
+    and send as a new entry), 删除 (to the trash at once, no confirmation), 多选 (multi-select: tap more rows; delete
+    moves them to the trash). Photo lines are not copied; an entry with photos only has the two copy items disabled.
   - "LifeLog ›" opens Settings; the search icon opens Search.
   - Composer: the input, then camera / gallery / entry time on the left and 排版 (layout) on the right; photos wait in a
     tray above the input, a chosen time shows as a chip.

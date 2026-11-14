@@ -62,7 +62,8 @@ async function capture(browser: Browser, theme: Theme) {
 
   flow('Record', 'The main log is a chat-style stream: oldest at the top, newest above the composer, grouped by day. '
     + 'Type (or dictate with the keyboard) and send; the time is taken when sent. Long entries are clamped to three lines. '
-    + 'Entries from the last hour show seconds on a small line under the time (the column keeps its width).')
+    + 'Entries from the last hour show seconds on a small line under the time (the column keeps its width); while the '
+    + 'newest entry is one of them, the time since it counts up under it (the rest between two sets).')
   await shot('Empty log', 'First launch.')
   await send('开始练胸')
   await at('2026-11-08T19:42:00')
@@ -177,12 +178,16 @@ async function capture(browser: Browser, theme: Theme) {
   await back().click()
   await page.getByRole('textbox', { name: '新记录' }).fill('')
 
-  flow('Multi-select delete', 'Long-press an entry to start selecting; tap more entries; delete moves them all to the trash.')
+  flow('Entry menu', 'Long-press an entry: a menu opens next to it (below, or above when there is no room). 复制 copies '
+    + 'the text; 复制到输入框 puts it in the composer, after anything already typed, to change and send as a new entry; '
+    + '删除 moves the entry to the trash at once; 多选 starts selecting: tap more entries, delete moves them all to the trash.')
   const box = (await entry('开始练胸').boundingBox())!
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
   await page.mouse.down()
   await page.waitForTimeout(700)
   await page.mouse.up()
+  await shot('Menu', 'A tap outside or back closes it.')
+  await page.getByRole('menuitem', { name: '多选' }).click()
   await entry('卧推，60 公斤').click()
   await shot('Selecting', 'Back or ✕ leaves selection.')
   await page.getByRole('button', { name: /^删除 2 条/ }).click()

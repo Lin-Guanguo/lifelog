@@ -34,17 +34,17 @@ export async function sync(dav: WebDav, records: Records, state: SyncState, dirt
   const remote = await dav.version(url)
   const remoteChanged = remote !== null && remote !== state.remoteVersion
   const merged = remoteChanged && await records.merge(await fromSqliteFile(await dav.get(url)))
+  // Nothing new here: adopt the remote version, without reading the log. Uploading anyway would make
+  // two devices take turns re-uploading the same data.
+  if (remote !== null && !dirty && !merged) {
+    return { state: { remoteVersion: remote, lastSyncAt: now }, merged, uploaded: false }
+  }
+
   // One snapshot for cleaning up photos and for the upload.
   beforeUpload()
   const rows = await records.all()
   const inUse = new Set(rows.filter((r) => r.purged_at === null).flatMap((r) => photosOf(r.content).map((p) => p.file)))
   const here = photos ? await removeUnusedPhotos(photos, inUse, now) : []
-  // Nothing new here: adopt the remote version. Uploading anyway would make two devices
-  // take turns re-uploading the same data.
-  if (remote !== null && !dirty && !merged) {
-    return { state: { remoteVersion: remote, lastSyncAt: now }, merged, uploaded: false }
-  }
-
   if (remote === null) await dav.ensureDirectory()
   // Photos first, so a database on the server never references a photo that is not there.
   if (photos) await uploadPhotos(dav, here, photos)

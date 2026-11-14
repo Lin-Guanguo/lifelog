@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import { Clipboard } from '@capacitor/clipboard'
 import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { pushBackHandler } from '../back'
-import { chooseTime, clearDraft, draft, importPhotos, isOld, offerPhotoTimes } from '../compose'
+import { chooseTime, clearDraft, draft, importPhotos, isOld, offerPhotoTimes, showNotice } from '../compose'
 import type { LogRecord } from '../data/records'
 import { groupByDay, logTime, secondsOf, timeOf } from '../format'
 import { t } from '../i18n'
@@ -10,6 +11,8 @@ import type { PhotoSource } from '../media/photos'
 import { db, locateRequest, logChanged, logVersion, openScreen, screens, sent } from '../store'
 import { around, EDGE_PX, EMPTY, extendDown, extendUp, JUMP_PX, newest, refresh, type Window } from '../timeline'
 import AppIcon from '../components/AppIcon.vue'
+import ElapsedLine from '../components/ElapsedLine.vue'
+import EntryMenu, { type EntryAction } from '../components/EntryMenu.vue'
 import EntrySheet from '../components/EntrySheet.vue'
 import MediaImage from '../components/MediaImage.vue'
 import PhotoStrip from '../components/PhotoStrip.vue'
@@ -64,17 +67,40 @@ async function toggleAll() {
 let pressTimer: number | undefined
 let pressOrigin = { x: 0, y: 0 }
 let longPressed = false
+// A long press opens the entry's menu, next to the entry.
+const menu = ref<{ record: LogRecord; x: number; top: number; bottom: number }>()
 
 function onPointerDown(event: PointerEvent, record: LogRecord) {
   longPressed = false
   pressOrigin = { x: event.clientX, y: event.clientY }
   window.clearTimeout(pressTimer)
   if (selecting.value) return
+  const entry = event.currentTarget as HTMLElement
   pressTimer = window.setTimeout(() => {
     longPressed = true
-    toggle(record)
+    const { top, bottom } = entry.getBoundingClientRect()
+    menu.value = { record, x: pressOrigin.x, top, bottom }
     navigator.vibrate?.(15)
   }, LONG_PRESS_MS)
+}
+
+async function onMenu(action: EntryAction) {
+  const record = menu.value!.record
+  const text = textOf(record.content)
+  if (action === 'select') toggle(record)
+  else if (action === 'delete') {
+    await db().trashEntries([record.entry_id])
+    logChanged()
+  } else if (action === 'copy') {
+    await Clipboard.write({ string: text })
+    showNotice(t('menu.copied'))
+  } else {
+    // After what is already typed, so nothing is lost; the cursor ends up after it.
+    draft.text = draft.text ? `${draft.text}\n${text}` : text
+    composer.value?.focus()
+    await nextTick()
+    resizeComposer()
+  }
 }
 
 function onPointerMove(event: PointerEvent) {
@@ -270,7 +296,8 @@ function openLayout() {
   openScreen({ name: 'compose' })
 }
 
-// Entries from the last hour also show seconds; re-checked every half minute so they drop off on time.
+// Entries from the last hour also show seconds, and the newest of them the time since (ElapsedLine); re-checked every
+// half minute so they drop off on time.
 const RECENT_MS = 3_600_000
 const now = ref(Date.now())
 const recent = (ms: number) => now.value - ms < RECENT_MS
@@ -278,6 +305,7 @@ let clock: number | undefined
 onMounted(() => { clock = window.setInterval(() => { now.value = Date.now() }, 30_000) })
 onUnmounted(() => window.clearInterval(clock))
 watch(logVersion, () => { now.value = Date.now() })
+const latest = computed(() => (win.value.newer ? undefined : drawn.value[drawn.value.length - 1]))
 
 onMounted(async () => {
   await change(() => newest(db()), false)
@@ -315,7 +343,7 @@ onMounted(async () => {
         <section v-for="day in days" :key="day.key">
           <div class="daypill">{{ day.label }}</div>
           <div v-for="record in day.rows" :key="record.id" class="entry" :data-entry="record.entry_id"
-            :class="{ selected: selected.has(record.entry_id), located: located === record.entry_id }"
+            :class="{ selected: selected.has(record.entry_id) || menu?.record.entry_id === record.entry_id, located: located === record.entry_id }"
             role="button" tabindex="0"
             @pointerdown="onPointerDown($event, record)" @pointermove="onPointerMove" @pointerup="cancelPress"
             @pointercancel="cancelPress" @pointerleave="cancelPress" @contextmenu.prevent
@@ -328,6 +356,7 @@ onMounted(async () => {
             </div>
           </div>
         </section>
+        <ElapsedLine v-if="latest && recent(latest.logged_at)" :since="latest.logged_at" />
       </main>
       <button v-if="farFromLatest && !selecting" class="to-latest" type="button" :aria-label="t('main.toLatest')" @click="toLatest">
         <AppIcon name="down" :size="20" />
@@ -365,6 +394,8 @@ onMounted(async () => {
       </div>
     </div>
 
+    <EntryMenu v-if="menu" :x="menu.x" :top="menu.top" :bottom="menu.bottom" :has-text="textOf(menu.record.content) !== ''"
+      @pick="onMenu" @close="menu = undefined" />
     <EntrySheet v-if="sheetRecord" :record="sheetRecord" @close="sheetRecord = undefined" />
     <PhotoViewer v-if="viewer !== undefined" :photos="photoIndex.photos" :entries="photoIndex.entries" :start="viewer"
       @close="viewer = undefined" @entry="(record) => (sheetRecord = record)" />

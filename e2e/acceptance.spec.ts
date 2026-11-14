@@ -84,8 +84,37 @@ test('v1 acceptance flow', async ({ page }) => {
   await confirmDelete.getByRole('button', { name: '删除' }).click()
   await expect(entry(page, '开始练胸')).toHaveCount(0)
 
-  // Long-press multi-select delete
+  // Long-press opens the entry's menu; a tap outside closes it
+  const composer = page.getByRole('textbox', { name: '新记录' })
+  const menu = page.getByRole('menu', { name: '记录操作' })
   await longPress(page, '卧推，60 公斤')
+  await expect(menu.getByRole('menuitem')).toHaveText(['复制', '复制到输入框', '删除', '多选'])
+  await page.mouse.click(8, 8)
+  await expect(menu).toHaveCount(0)
+  // Copy to input: after what is already typed, ready to edit
+  await composer.fill('先写的')
+  await longPress(page, '卧推，60 公斤')
+  await menu.getByRole('menuitem', { name: '复制到输入框' }).click()
+  await expect(composer).toHaveValue('先写的\n卧推，60 公斤，10 次')
+  await expect(composer).toBeFocused()
+  await composer.fill('')
+  // Copy
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
+  await longPress(page, '卧推，60 公斤')
+  await menu.getByRole('menuitem', { name: '复制', exact: true }).click()
+  await expect(page.getByRole('status')).toHaveText('已复制')
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('卧推，60 公斤，10 次')
+  // Delete: straight to the trash
+  await send(page, '记错了')
+  // Under the newest entry: the time since it, while it shows seconds
+  await expect(page.locator('main .elapsed')).toHaveText(/^距今 (\d+ 分 )?\d+ 秒$/)
+  await longPress(page, '记错了')
+  await menu.getByRole('menuitem', { name: '删除' }).click()
+  await expect(entry(page, '记错了')).toHaveCount(0)
+
+  // Multi-select delete
+  await longPress(page, '卧推，60 公斤')
+  await menu.getByRole('menuitem', { name: '多选' }).click()
   await expect(page.getByRole('heading', { name: '已选 1 条' })).toBeVisible()
   await entry(page, '很长的一条记录').click()
   await expect(page.getByRole('heading', { name: '已选 2 条' })).toBeVisible()
@@ -102,9 +131,9 @@ test('v1 acceptance flow', async ({ page }) => {
 
   // Settings → trash
   await page.getByRole('button', { name: 'LifeLog，打开设置' }).click()
-  await expect(page.getByRole('button', { name: /回收站/ })).toContainText('4 项')
+  await expect(page.getByRole('button', { name: /回收站/ })).toContainText('5 项')
   await page.getByRole('button', { name: /回收站/ }).click()
-  await expect(page.locator('.group')).toHaveCount(4)
+  await expect(page.locator('.group')).toHaveCount(5)
   await expect(page.locator('.group', { hasText: '同样重量，8 词' })).toContainText('有当前内容')
   await expect(page.locator('.group', { hasText: '开始练胸' })).toContainText('整条已删除')
   await expect(page.locator('.trow').first()).toContainText('还剩7天')

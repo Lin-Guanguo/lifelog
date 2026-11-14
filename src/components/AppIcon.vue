@@ -20,6 +20,9 @@ const PATHS = {
   info: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 11v6M12 7.5h.01',
   locate: 'M12 2v4M12 18v4M2 12h4M18 12h4M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10z',
   down: 'M12 5v14M6 13l6 6 6-6',
+  copy: 'M9 9h11v11H9zM5 15H4V4h11v1',
+  toInput: 'M20 5v6a4 4 0 0 1-4 4H5M9 11l-4 4 4 4',
+  select: 'M4 4h16v16H4zM8 12l3 3 5-6',
 } as const
 
 defineProps<{ name: keyof typeof PATHS; size?: number }>()

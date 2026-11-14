@@ -3,6 +3,14 @@
 Each release's notes come from its section here (the release workflow requires one) and are shown in the app's
 update dialog.
 
+## 0.4.8
+
+- Long-press an entry for a menu: 复制, 复制到输入框 (its text goes into the composer, after anything already typed,
+  to change and send as a new entry), 删除 (to the trash at once), 多选 (what a long press did before).
+- While the newest entry shows seconds (the last hour), a line under it counts the time since it: 距今 2 分 41 秒.
+- A sync with nothing new on either side is one small request and no longer reads the log, so a short interval
+  (5 minutes) costs next to nothing. Unused photos on the device are cleaned up when a sync merges or uploads.
+
 ## 0.4.7
 
 - The main list reads the log from the database in pages (200 at first, 100 more near an edge, at most 500 held)

@@ -1,5 +1,5 @@
 import initSqlJs from 'sql.js'
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMockDav } from '../../test-support/webdav-mock'
 import { createRecords, type Records } from '../data/records'
 import { migrate } from '../data/schema'
@@ -70,9 +70,11 @@ describe('sync', () => {
     const dav = createWebDav(CONFIG, transport())
     const { state } = await sync(dav, phone, {}, true)
     requests = []
+    const all = vi.spyOn(phone, 'all')
     const result = await sync(dav, phone, state, false)
     expect(result.uploaded).toBe(false)
     expect(requests).toEqual(['PROPFIND'])
+    expect(all).not.toHaveBeenCalled() // the log is not read either
   })
 
   it('replaces the remote file in place and removes a temp file left by older versions', async () => {
@@ -190,13 +192,13 @@ describe('sync', () => {
     const uploaded = [...server.files.keys()].filter((k) => k.includes('/media/')).length
     expect(uploaded).toBe(2) // a and d
 
-    // Permanently deleting the entry frees its photo at the next sync, even with nothing to upload.
+    // Permanently deleting the entry frees its photo at the next sync.
     const trashed = (await phone.listLive()).find((r) => r.content.startsWith('trashed'))!
     await phone.trashEntries([trashed.entry_id])
     ;({ state } = await sync(dav, phone, state, true, undefined, now, files))
     expect(files.names()).toEqual([photo('a'), photo('c'), photo('d')]) // in the trash: still needed
     await phone.purge((await phone.listTrash()).trashed.map((r) => r.id))
-    ;({ state } = await sync(dav, phone, state, false, undefined, now, files))
+    ;({ state } = await sync(dav, phone, state, true, undefined, now, files))
     expect(files.names()).toEqual([photo('a'), photo('c')])
     expect([...server.files.keys()].filter((k) => k.includes('/media/'))).toHaveLength(uploaded) // server untouched
   })

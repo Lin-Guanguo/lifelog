@@ -32,6 +32,7 @@ test('a long log: window, locate from search, jump to latest, scroll back', asyn
   await page.mouse.down()
   await page.waitForTimeout(700) // long press
   await page.mouse.up()
+  await page.getByRole('menuitem', { name: '多选' }).click()
   await expect(page.getByRole('heading', { name: '已选 1 条' })).toBeVisible()
   await page.getByRole('button', { name: '全选' }).click()
   await expect(page.getByRole('heading', { name: `已选 ${COUNT} 条` })).toBeVisible()
