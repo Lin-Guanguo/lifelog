@@ -91,6 +91,23 @@ test('a long log: window, locate from search, jump to latest, scroll back', asyn
     await page.evaluate((v) => document.documentElement.style.setProperty('--safe-area-inset-bottom', v), inset)
     await expect.poll(below).toBe(0)
   }
+  const full = page.viewportSize()!
+  const withKeyboard = { width: full.width, height: full.height - 300 }
+  await page.setViewportSize(withKeyboard)
+  await expect.poll(below).toBe(0)
+  await page.setViewportSize(full)
+  await expect.poll(below).toBe(0)
+  // Anywhere else it keeps its position: what was at the top stays at the top.
+  await page.locator('.stream').evaluate((el) => el.scrollBy(0, -400))
+  const top = () => page.locator('.stream').evaluate((el) => Math.round(el.scrollTop))
+  const before = await top()
+  await page.setViewportSize(withKeyboard)
+  await expect.poll(below).toBe(700)
+  expect(await top()).toBe(before)
+  await page.setViewportSize(full)
+  await expect.poll(below).toBe(400)
+  expect(await top()).toBe(before)
+  await page.locator('.stream').evaluate((el) => el.scrollTo({ top: el.scrollHeight }))
 
   // Sending at an earlier time locates the new entry instead, where it landed.
   await page.getByRole('button', { name: '记录时间' }).click()
