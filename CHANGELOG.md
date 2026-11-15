@@ -3,7 +3,7 @@
 Each release's notes come from its section here (the release workflow requires one) and are shown in the app's
 update dialog.
 
-## Unreleased
+## 0.4.9
 
 - Fix: after the keyboard closed, the list ended a little above its bottom, hiding the 距今 line. At its bottom, the
   list now stays there when its height changes (the keyboard opening or closing, the composer growing).
