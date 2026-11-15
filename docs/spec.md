@@ -104,7 +104,7 @@ it; 排版 (layout) opens the draft in the editor to place photos between paragr
 laid out by count: 1 keeps its shape (≤160 px tall, ≤70 % wide, cropped to 3:4 … 2:1), 2 side by side, 3 in a row,
 4 as 2×2, 5+ in rows of three.
 
-Entry time: when photos from the picker or Share include one taken over 30 minutes ago, a step offers each photo's
+Entry time: when photos from the picker or Share include one taken over 10 minutes ago, a step offers each photo's
 capture time, now, or a custom time (also from the clock under the input: last week's days, or any earlier date,
 and hour/minute; never later than now). The entry's `logged_at` is that time.
 

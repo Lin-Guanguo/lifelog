@@ -17,7 +17,7 @@ export function clearDraft(): void {
 }
 
 // Photos taken longer ago than this suggest filling in the day: offer their capture times.
-export const OLD_PHOTO_MS = 30 * 60_000
+export const OLD_PHOTO_MS = 10 * 60_000
 
 export function isOld(photo: PhotoRef, now = Date.now()): boolean {
   const taken = takenAt(photo)

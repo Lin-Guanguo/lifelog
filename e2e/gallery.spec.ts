@@ -118,7 +118,7 @@ async function capture(browser: Browser, theme: Theme) {
   ])
   const step = page.getByRole('dialog', { name: '记录时间' })
   await expect(step.locator('.option img')).toHaveCount(3)
-  await shot('Older photos: choose the time', 'Opens by itself after 相册 or Share when a photo is over 30 minutes old. '
+  await shot('Older photos: choose the time', 'Opens by itself after 相册 or Share when a photo is over 10 minutes old. '
     + 'Each photo’s capture time, large; now and custom fixed at the bottom. Starts on the first photo.')
   await step.getByRole('button', { name: /自定义/ }).click()
   await shot('Custom time', 'Also from 🕑 under the input. Day chips for the last week (更早 = system date picker), '
