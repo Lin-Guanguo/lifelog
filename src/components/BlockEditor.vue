@@ -349,7 +349,7 @@ onUnmounted(() => cleanup())
 <style scoped>
 .editor { flex-grow: 1; overflow-y: auto; padding: 14px 16px 24px; display: flex; flex-direction: column; gap: 10px; }
 .editor textarea { border: 0; outline: none; resize: none; background: transparent; font-size: 17px; line-height: 1.6; padding: 2px 0;
-  min-height: 28px; overflow: hidden; field-sizing: content; }
+  min-height: 28px; overflow: hidden; field-sizing: content; flex-shrink: 0; /* the editor scrolls, the field is never squeezed */ }
 .group { display: flex; flex-wrap: wrap; gap: 8px; }
 .thumb { position: relative; width: 96px; height: 96px; border-radius: 10px; flex-shrink: 0; touch-action: none; user-select: none;
   -webkit-user-select: none; -webkit-touch-callout: none; cursor: grab; }

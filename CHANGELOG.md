@@ -8,6 +8,8 @@ update dialog.
 - Fix: after the keyboard closed, the list ended a little above its bottom, hiding the 距今 line. At its bottom, the
   list now stays there when its height changes (the keyboard opening or closing, the composer growing).
 - Photos from the gallery or Share offer their capture time when taken over 10 minutes ago (was 30).
+- Fix: a text longer than the screen (or than the space above the keyboard) could not be scrolled while editing or
+  writing full screen; its top was cut off.
 
 ## 0.4.8
 

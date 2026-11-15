@@ -76,6 +76,16 @@ test('v1 acceptance flow', async ({ page }) => {
   await expect(page.getByRole('alertdialog')).toHaveCount(0)
   await expect(editor).toBeHidden()
 
+  // A text longer than the screen: the field shows all of it and the editor scrolls
+  await entry(page, '开始练胸').click()
+  await sheet.getByRole('button', { name: '编辑' }).click()
+  await editor.fill(Array.from({ length: 80 }, (_, i) => `第 ${i + 1} 行`).join('\n'))
+  expect(await editor.evaluate((el) => el.scrollHeight - el.clientHeight)).toBe(0)
+  expect(await page.locator('.editor').evaluate((el) => el.scrollHeight > el.clientHeight * 2)).toBe(true)
+  await editor.fill('开始练胸')
+  await back(page).click()
+  await expect(editor).toBeHidden()
+
   // Delete from the sheet asks first
   await entry(page, '开始练胸').click()
   await sheet.getByRole('button', { name: '删除' }).click()
