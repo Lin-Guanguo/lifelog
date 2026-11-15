@@ -58,7 +58,7 @@ A photo is a line of its own, with a blank line around it:
 ## Time
 
 - `logged_at` becomes "when it happened" (default: when written); fixed once saved, as now.
-- **Time step**: after 🖼 or Share, if any photo was taken more than ~30 min ago, a screen lists each photo with its
+- **Time step**: after 🖼 or Share, if any photo was taken more than 10 min ago, a screen lists each photo with its
   capture time in large type (tap to use it); 现在 (now) and 🕑 自定义 (custom) fixed at the bottom. Starts on the first
   photo's time. Then back to the record screen, with the chosen time as a chip.
 - **Custom time picker** (🕑 and 自定义): day chips (today … 6 days ago, 更早 = system date picker), hour and minute
