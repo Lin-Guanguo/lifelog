@@ -3,6 +3,11 @@
 Each release's notes come from its section here (the release workflow requires one) and are shown in the app's
 update dialog.
 
+## 0.4.10
+
+- Fix: lifting the finger right at the long-press buzz did not open the entry's menu; it took holding a little longer.
+  The menu now opens with the system's long press (and follows the system's long-press duration).
+
 ## 0.4.9
 
 - Fix: after the keyboard closed, the list ended a little above its bottom, hiding the 距今 line. At its bottom, the
