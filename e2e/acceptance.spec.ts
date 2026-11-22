@@ -101,6 +101,11 @@ test('v1 acceptance flow', async ({ page }) => {
   await expect(menu.getByRole('menuitem')).toHaveText(['复制', '复制到输入框', '删除', '多选'])
   await page.mouse.click(8, 8)
   await expect(menu).toHaveCount(0)
+  // The system's long press (a contextmenu event) opens it without waiting for the timer
+  await entry(page, '卧推，60 公斤').click({ button: 'right' })
+  await expect(menu).toBeVisible()
+  await page.mouse.click(8, 8)
+  await expect(menu).toHaveCount(0)
   // Copy to input: after what is already typed, ready to edit
   await composer.fill('先写的')
   await longPress(page, '卧推，60 公斤')

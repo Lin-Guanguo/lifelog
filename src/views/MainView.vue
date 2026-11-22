@@ -77,11 +77,22 @@ function onPointerDown(event: PointerEvent, record: LogRecord) {
   if (selecting.value) return
   const entry = event.currentTarget as HTMLElement
   pressTimer = window.setTimeout(() => {
-    longPressed = true
-    const { top, bottom } = entry.getBoundingClientRect()
-    menu.value = { record, x: pressOrigin.x, top, bottom }
+    openMenu(entry, record)
     navigator.vibrate?.(15)
   }, LONG_PRESS_MS)
+}
+
+function openMenu(entry: HTMLElement, record: LogRecord) {
+  window.clearTimeout(pressTimer)
+  longPressed = true
+  const { top, bottom } = entry.getBoundingClientRect()
+  menu.value = { record, x: pressOrigin.x, top, bottom }
+}
+
+// Android's own long press (its timeout is a system setting, 400 ms by default) vibrates and sends this event:
+// the menu opens with that buzz instead of waiting for the timer, which stays for mouse presses.
+function onContextMenu(event: Event, record: LogRecord) {
+  if (!selecting.value && !longPressed) openMenu(event.currentTarget as HTMLElement, record)
 }
 
 async function onMenu(action: EntryAction) {
@@ -356,7 +367,7 @@ onMounted(async () => {
             :class="{ selected: selected.has(record.entry_id) || menu?.record.entry_id === record.entry_id, located: located === record.entry_id }"
             role="button" tabindex="0"
             @pointerdown="onPointerDown($event, record)" @pointermove="onPointerMove" @pointerup="cancelPress"
-            @pointercancel="cancelPress" @pointerleave="cancelPress" @contextmenu.prevent
+            @pointercancel="cancelPress" @pointerleave="cancelPress" @contextmenu.prevent="onContextMenu($event, record)"
             @click="onClick(record)" @keydown.enter="onClick(record)">
             <input v-if="selecting" type="checkbox" tabindex="-1" :checked="selected.has(record.entry_id)" aria-hidden="true">
             <time>{{ timeOf(record.logged_at) }}<small v-if="recent(record.logged_at)" class="sec">:{{ secondsOf(record.logged_at) }}</small></time>
