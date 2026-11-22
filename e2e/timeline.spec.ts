@@ -113,6 +113,8 @@ test('a long log: window, locate from search, jump to latest, scroll back', asyn
   await expect.poll(below).toBe(100)
   await page.setViewportSize(full)
   await expect.poll(below).toBe(0)
+  // The inset comes back in a later frame, after the list has seen the first resize.
+  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))))
   await page.evaluate(() => document.documentElement.style.setProperty('--safe-area-inset-bottom', '40px'))
   await expect.poll(below).toBe(0)
   await page.evaluate(() => document.documentElement.style.setProperty('--safe-area-inset-bottom', '0px'))
