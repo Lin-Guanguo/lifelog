@@ -63,8 +63,21 @@ test('WebDAV sync: upload, interval auto-sync, automatic merge on a fresh instal
   expect((await remote()).live).toEqual(['旧手机 第一条'])
   // …but once 5 minutes have passed since the last sync, the periodic check uploads it
   await page.clock.fastForward('04:00')
-  await expect(page.locator('.sync-chip')).toHaveText(/^已同步 \d{2}:\d{2}$/)
+  await expect(page.locator('.sync-chip')).toHaveText('已同步')
   expect((await remote()).live).toEqual(['旧手机 第一条', '旧手机 第二条'])
+
+  // Tapping the chip syncs at once
+  await send(page, '旧手机 点一下')
+  await expect(page.locator('.sync-chip')).toHaveText('待同步')
+  await page.locator('.sync-chip').click()
+  await expect(page.locator('.sync-chip')).toHaveText('已同步')
+  expect((await remote()).live).toEqual(['旧手机 点一下', '旧手机 第一条', '旧手机 第二条'])
+  // Already synced: a tap sends nothing
+  let requests = 0
+  page.on('request', (request) => { if (request.url().startsWith(DAV)) requests++ })
+  await page.locator('.sync-chip').click()
+  await page.clock.fastForward('00:01')
+  expect(requests).toBe(0)
 
   // Manual sync from settings
   await send(page, '旧手机 第三条')
@@ -72,7 +85,7 @@ test('WebDAV sync: upload, interval auto-sync, automatic merge on a fresh instal
   await page.getByRole('button', { name: '立即同步' }).click()
   // Finished: back to "last synced" with nothing pending (not merely "syncing…")
   await expect(page.getByRole('status')).toHaveText(/^上次同步[^待]*$/)
-  expect((await remote()).live).toEqual(['旧手机 第一条', '旧手机 第三条', '旧手机 第二条'])
+  expect((await remote()).live).toEqual(['旧手机 点一下', '旧手机 第一条', '旧手机 第三条', '旧手机 第二条'])
 
   // A fresh install merges the existing backup automatically instead of overwriting it
   const fresh = await browser.newContext({ locale: 'zh-CN', viewport: { width: 412, height: 915 } })
@@ -81,9 +94,9 @@ test('WebDAV sync: upload, interval auto-sync, automatic merge on a fresh instal
   await send(phone, '新手机 第一条')
   await configure(phone)
   await expect(phone.getByRole('status')).toContainText('上次同步')
-  expect((await remote()).live).toEqual(['新手机 第一条', '旧手机 第一条', '旧手机 第三条', '旧手机 第二条'])
+  expect((await remote()).live).toEqual(['新手机 第一条', '旧手机 点一下', '旧手机 第一条', '旧手机 第三条', '旧手机 第二条'])
   await phone.getByRole('button', { name: '返回' }).click()
-  await expect(phone.locator('main .entry')).toHaveCount(4)
+  await expect(phone.locator('main .entry')).toHaveCount(5)
 
   // Custom interval: 90 minutes, then manual only
   await phone.getByRole('button', { name: 'LifeLog，打开设置' }).click()

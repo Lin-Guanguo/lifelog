@@ -3,6 +3,12 @@
 Each release's notes come from its section here (the release workflow requires one) and are shown in the app's
 update dialog.
 
+## 0.4.11
+
+- The sync chip at the top of the main screen shows only the state (已同步 / 待同步 / 同步中 / 同步失败), without the
+  time. Tapping it while there is something to sync (or the last sync failed) syncs at once instead of opening
+  Settings; a failed sync shows its reason.
+
 ## 0.4.10
 
 - Fix: lifting the finger right at the long-press buzz did not open the entry's menu; it took holding a little longer.

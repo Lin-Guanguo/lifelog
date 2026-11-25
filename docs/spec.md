@@ -183,7 +183,7 @@ JavaScript or have to fit in memory.
   once; then 已在相册, also for 0.4.x names), 分享 (the original). A photo another device added is downloaded first.
 - **Search**: highlighted matches grouped by day, at most the newest 500 (a note says when there are more); tap opens
   the sheet.
-- **Settings**: language (system / 中文 / English); trash auto-clear period (presets + custom dialog) and trash entry; photo copies (count, size); WebDAV sync (connection, status, sync now, interval); about (check for updates, author pop-up). The main header shows a sync status chip.
+- **Settings**: language (system / 中文 / English); trash auto-clear period (presets + custom dialog) and trash entry; photo copies (count, size); WebDAV sync (connection, status, sync now, interval); about (check for updates, author pop-up). The main header shows a sync status chip (synced, not synced, syncing, failed, without the time); tapping it while not synced or failed syncs now (a failure shows its reason as a notice); synced, a tap does nothing.
 - **Trash**: search box; cards grouped by entry (current text shown for reference); rows show original/saved time and days left; select rows or whole entries; restore or delete forever. At most the newest 500 rows are listed (a note says when
   there are more; search finds older ones).
 

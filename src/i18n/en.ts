@@ -123,7 +123,7 @@ export default {
   'sync.errorUrl': 'The server URL is not valid.',
   'sync.errorHttps': 'Only https:// addresses are supported, to protect your password.',
   'sync.errorDirectory': 'Enter a remote folder.',
-  'sync.chipSynced': 'Synced {time}',
+  'sync.chipSynced': 'Synced',
   'sync.chipPending': 'Not synced',
   'sync.chipSyncing': 'Syncing',
   'sync.chipError': 'Sync failed',

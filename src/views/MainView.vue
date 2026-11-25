@@ -17,7 +17,7 @@ import EntrySheet from '../components/EntrySheet.vue'
 import MediaImage from '../components/MediaImage.vue'
 import PhotoStrip from '../components/PhotoStrip.vue'
 import PhotoViewer from '../components/PhotoViewer.vue'
-import { sync } from '../sync/controller'
+import { sync, syncNow } from '../sync/controller'
 
 const LONG_PRESS_MS = 500
 const MOVE_TOLERANCE_PX = 10
@@ -39,8 +39,16 @@ const syncChip = computed(() => {
   if (sync.status === 'syncing') return { tone: '', label: t('sync.chipSyncing') }
   if (sync.status === 'error') return { tone: 'bad', label: t('sync.chipError') }
   if (sync.dirty || !sync.state.lastSyncAt) return { tone: 'pending', label: t('sync.chipPending') }
-  return { tone: 'ok', label: t('sync.chipSynced', { time: timeOf(sync.state.lastSyncAt) }) }
+  return { tone: 'ok', label: t('sync.chipSynced') }
 })
+
+// Tapping the chip syncs when something is waiting or the last try failed; a failure says why (the details stay
+// in Settings). Already synced, there is nothing to do.
+async function syncFromChip() {
+  if (syncChip.value?.tone !== 'pending' && syncChip.value?.tone !== 'bad') return
+  await syncNow()
+  if (sync.status === 'error') showNotice(sync.error)
+}
 
 let removeSelectionBack: (() => void) | undefined
 watch(selecting, (on) => {
@@ -350,7 +358,7 @@ onMounted(async () => {
       <button class="brand" type="button" :aria-label="t('app.openSettings')" @click="openScreen({ name: 'settings' })">
         {{ t('app.name') }}<AppIcon name="chevron" :size="16" />
       </button>
-      <button v-if="syncChip" class="sync-chip" :class="syncChip.tone" type="button" @click="openScreen({ name: 'settings' })">
+      <button v-if="syncChip" class="sync-chip" :class="syncChip.tone" type="button" @click="syncFromChip">
         {{ syncChip.label }}
       </button>
       <button class="icon-btn" type="button" :aria-label="t('main.search')" @click="openScreen({ name: 'search' })">
@@ -428,7 +436,8 @@ onMounted(async () => {
   font-size: 22px; font-weight: 600; text-align: left; }
 .brand :deep(svg) { color: var(--muted); }
 .sync-chip { flex-shrink: 0; height: 30px; border: 0; border-radius: 999px; padding: 0 10px; font-size: 12px;
-  background: var(--chip); color: var(--muted); }
+  background: var(--chip); color: var(--muted); margin-right: 8px; }
+.sync-chip:active { opacity: .6; }
 .sync-chip.ok { color: var(--ok); }
 .sync-chip.pending { color: var(--warn); background: var(--warn-soft); }
 .sync-chip.bad { color: var(--danger); }

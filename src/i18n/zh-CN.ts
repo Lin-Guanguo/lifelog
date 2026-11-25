@@ -122,7 +122,7 @@ export default {
   'sync.errorUrl': '服务器地址无效。',
   'sync.errorHttps': '为了保护密码，只支持 https:// 地址。',
   'sync.errorDirectory': '请填写远端目录。',
-  'sync.chipSynced': '已同步 {time}',
+  'sync.chipSynced': '已同步',
   'sync.chipPending': '待同步',
   'sync.chipSyncing': '同步中',
   'sync.chipError': '同步失败',

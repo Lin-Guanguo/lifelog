@@ -226,7 +226,7 @@ async function capture(browser: Browser, theme: Theme) {
   await shot('Custom interval', 'Minutes, hours or days, or manual only.')
   await page.getByRole('alertdialog').getByRole('button', { name: '取消' }).click()
   await back().click()
-  await shot('Sync status in the header', 'Tap the chip to open settings.')
+  await shot('Sync status in the header', '已同步, 待同步, 同步中 or 同步失败. Tap 待同步 or 同步失败 to sync now (a failure shows its reason); 已同步 does nothing.')
 
   flow('Trash', 'Settings → Trash. Rows are grouped by entry: deleted entries and pre-edit texts. Search, restore, '
     + 'or delete permanently. Restoring an old text of an entry that still has current text asks to overwrite it.')
